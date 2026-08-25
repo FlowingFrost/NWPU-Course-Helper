@@ -1,12 +1,13 @@
 import { extractCheckedLessonsFromDom, rowElementToRawLesson } from './domExtractor';
 import { adaptJsonSearchResponse } from './jsonAdapter';
-import { elTableRowToSelectionLesson, elTableRowToRawLesson } from './selectionExtractor';
+import { elTableRowToSelectionLesson, elTableRowToRawLesson, extractSelectedLessonsFromDom } from './selectionExtractor';
 import type { RawLesson } from './model';
 import type { Category, Schedule } from '../../shared/types';
 import type { ExtMessage, ExtResponse } from './messaging';
 import { loadSettings } from './messaging';
 import { buildPreviewElement } from './preview';
-import { buildEnrollmentReport, buildUpdateCommands, courseCodesOf, type UpdateReport } from './updateEnrollment';
+import { buildEnrollmentReport, buildUpdateCommands, buildActualSelectionCommand, summarizeSelectedRefs, courseCodesOf, type UpdateReport } from './updateEnrollment';
+import type { SelectedLessonRef } from './selectionExtractor';
 
 // 全校开课查询接口所需的 assembleFields（与页面内联脚本一致）
 const ASSEMBLE_FIELDS =
@@ -186,8 +187,8 @@ async function searchSelectionByCode(code: string, pageLimit: number, pageDelay:
   return out;
 }
 
-// 结果弹窗：列出全部更新明细 + 未查到的课程 + 未匹配的教学班
-function showSummaryModal(report: UpdateReport) {
+// 结果弹窗：列出全部更新明细 + 未查到的课程 + 未匹配的教学班 + 已选课程同步
+function showSummaryModal(report: UpdateReport, selected?: { lessons: number; courses: number } | null) {
   document.querySelector('.ch-summary-modal')?.remove();
   const overlay = document.createElement('div');
   overlay.className = 'ch-summary-modal';
@@ -252,6 +253,15 @@ function showSummaryModal(report: UpdateReport) {
     body.appendChild(ul);
   }
 
+  // 已选课程同步
+  if (selected) {
+    body.appendChild(section('已选课程同步'));
+    const p = document.createElement('div');
+    p.textContent = `已同步教务「已选课程」：${selected.courses} 门课程 / ${selected.lessons} 个教学班（用于前端「选课情况」校验是否完成选课）。`;
+    p.style.cssText = 'color:#16a34a;margin-bottom:12px;';
+    body.appendChild(p);
+  }
+
   // 未查到的课程
   if (report.notFoundCourses.length) {
     body.appendChild(section(`未查到课程（${report.notFoundCourses.length}）`));
@@ -286,7 +296,26 @@ function showSummaryModal(report: UpdateReport) {
   document.body.appendChild(overlay);
 }
 
-// 批量更新已选人数：驱动选课系统按存档课程编号逐门搜索，匹配教学班编号回填
+// 切换到「已选课程」tab（选课 SPA 主 tab，id 固定为 #tab-selectedLesson）
+async function ensureSelectedLessonTab(): Promise<boolean> {
+  const tab = document.getElementById('tab-selectedLesson') as HTMLElement | null;
+  if (!tab) return false;
+  if (tab.classList.contains('is-active')) return true;
+  tab.click();
+  await waitFor(() => tab.classList.contains('is-active'), 2000);
+  return tab.classList.contains('is-active');
+}
+
+// 收集教务「已选课程」tab 里实际已完成选课的教学班编号。
+// 返回 null 表示该页面没有「已选课程」tab（无法收集），调用方应跳过同步。
+async function collectSelectedLessons(): Promise<SelectedLessonRef[] | null> {
+  if (!(await ensureSelectedLessonTab())) return null;
+  await sleep(300);
+  return extractSelectedLessonsFromDom(document);
+}
+
+// 批量更新已选课程：驱动选课系统按存档课程编号逐门搜索回填已选人数/容量，
+// 再切到「已选课程」tab 收集实际选课结果回写存档（供前端「选课情况」校验）。
 async function updateEnrollments() {
   const schedule = await getSchedule();
   if (!schedule) {
@@ -300,7 +329,7 @@ async function updateEnrollments() {
     return;
   }
 
-  toast(`开始更新已选人数（共 ${codes.length} 门课）…`);
+  toast(`开始更新已选课程（共 ${codes.length} 门课）…`);
   const lessons: RawLesson[] = [];
   for (let i = 0; i < codes.length; i++) {
     try {
@@ -315,6 +344,12 @@ async function updateEnrollments() {
 
   const report = buildEnrollmentReport(schedule, lessons);
   const commands = buildUpdateCommands(schedule, lessons);
+
+  // 新增：切到「已选课程」tab，收集实际已完成选课的课程/教学班编号，回写存档供前端「选课情况」校验
+  const selectedRefs = await collectSelectedLessons();
+  const selected = selectedRefs ? summarizeSelectedRefs(selectedRefs) : null;
+  if (selectedRefs) commands.push(buildActualSelectionCommand(selectedRefs));
+
   if (commands.length) {
     const resp = await send({ type: 'APPLY_COMMANDS', commands });
     if (!resp.ok) {
@@ -323,9 +358,13 @@ async function updateEnrollments() {
     }
   }
 
-  if (settings.showUpdateResult) showSummaryModal(report);
+  if (settings.showUpdateResult) showSummaryModal(report, selected);
   else {
-    toast(`更新完成：${report.updates.length} 个候选更新${report.notFoundCourses.length ? `，${report.notFoundCourses.length} 门课未查到` : ''}`);
+    toast(
+      `更新完成：${report.updates.length} 个候选更新` +
+        (selected ? `，同步已选 ${selected.courses} 门` : '') +
+        (report.notFoundCourses.length ? `，${report.notFoundCourses.length} 门课未查到` : ''),
+    );
   }
 }
 
@@ -381,10 +420,11 @@ async function showPreview(btn: HTMLElement, lesson: RawLesson) {
   const rect = btn.getBoundingClientRect();
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  let left = rect.left;
+  // 以按钮右边距为起点，避免挡住按钮本身与下方同列的预览按钮
+  let left = rect.right + 6;
   let top = rect.bottom + 6;
-  // 防溢出
-  if (left + el.offsetWidth > vw - 8) left = Math.max(8, vw - el.offsetWidth - 8);
+  // 防溢出：右侧放不下则放到按钮左侧
+  if (left + el.offsetWidth > vw - 8) left = Math.max(8, rect.left - el.offsetWidth - 6);
   if (top + el.offsetHeight > vh - 8) top = Math.max(8, rect.top - el.offsetHeight - 6);
   el.style.left = `${left}px`;
   el.style.top = `${top}px`;
@@ -595,7 +635,7 @@ function fixTabOverlay() {
   }
 }
 
-// 在「我的选课状态」按钮左侧加「更新已选人数」按钮
+// 在「我的选课状态」按钮左侧加「更新已选课程」按钮
 function injectSelectionUpdateButton() {
   if (document.querySelector('.ch-update-btn')) return;
   const statusBtn = findButtonByText('我的选课状态');
@@ -604,8 +644,8 @@ function injectSelectionUpdateButton() {
   const btn = document.createElement('button');
   btn.className = 'ch-update-btn';
   btn.type = 'button';
-  btn.textContent = '更新已选人数';
-  btn.title = '先切到「全部课程」，再按存档里每门课的课程编号逐门查询，批量回填已选人数/容量';
+  btn.textContent = '更新已选课程';
+  btn.title = '先切到「全部课程」逐门查询回填已选人数/容量，再切到「已选课程」同步实际选课结果（用于前端「选课情况」校验）';
   btn.style.cssText =
     'margin-right:8px;padding:7px 15px;border-radius:4px;' +
     'border:1px solid #16a34a;background:#f0fdf4;color:#166534;cursor:pointer;font:12px sans-serif;line-height:1;';

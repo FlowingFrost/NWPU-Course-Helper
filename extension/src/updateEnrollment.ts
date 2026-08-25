@@ -1,6 +1,7 @@
 import type { Schedule } from '../../shared/types';
 import type { Command } from '../../shared/commands';
 import type { RawLesson } from './model';
+import type { SelectedLessonRef } from './selectionExtractor';
 
 // 一条「已选人数/容量」更新明细
 export interface EnrollmentUpdate {
@@ -136,6 +137,23 @@ export function buildSelectableCommands(schedule: Schedule, lessons: RawLesson[]
 // 一次性生成「已选人数 + 是否开放选课」的更新命令
 export function buildUpdateCommands(schedule: Schedule, lessons: RawLesson[]): Command[] {
   return [...buildEnrollmentCommands(schedule, lessons), ...buildSelectableCommands(schedule, lessons)];
+}
+
+// 教务「已选课程」tab 抓取结果 → set_actual_selection 命令（回写实际已完成选课的编号快照）
+export function buildActualSelectionCommand(refs: SelectedLessonRef[]): Command {
+  return {
+    op: 'set_actual_selection',
+    lessonCodes: [...new Set(refs.map((r) => r.lessonCode).map((c) => c.trim()).filter((c) => c !== ''))],
+    courseCodes: [...new Set(refs.map((r) => r.courseCode).map((c) => c.trim()).filter((c) => c !== ''))],
+  };
+}
+
+// 统计已选课程引用（供更新结果弹窗展示）
+export function summarizeSelectedRefs(refs: SelectedLessonRef[]): { lessons: number; courses: number } {
+  return {
+    lessons: new Set(refs.map((r) => r.lessonCode).filter((c) => c.trim() !== '')).size,
+    courses: new Set(refs.map((r) => r.courseCode).filter((c) => c.trim() !== '')).size,
+  };
 }
 
 // 存档里所有非空课程编号（用于逐门查询教务接口）

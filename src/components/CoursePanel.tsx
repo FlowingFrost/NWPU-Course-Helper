@@ -26,7 +26,7 @@ interface Props {
   schedule: Schedule;
   update: (fn: (s: Schedule) => Schedule) => void;
   openCourseId: string | null;
-  highlightOptionId: string | null;
+  highlightOptionIds: string[];
   onOpenCourse: (courseId: string) => void;
   onCloseCourse: () => void;
 }
@@ -189,12 +189,16 @@ function CourseCard({
   dotColor: string;
   onOpen: () => void;
 }) {
+  const hasSelected = course.category !== 'builtin' && course.options.some((o) => o.selected);
+  const notParticipating = course.participating === false;
   return (
-    <div className="course-card">
+    <div className={`course-card${hasSelected ? ' selected' : ''}${notParticipating ? ' off' : ''}`}>
       <div className="course-row" onClick={onOpen}>
         <span className="dot" style={{ background: dotColor }} />
         <span className="course-name">{course.name || '(未命名)'}</span>
         <span className={`badge ${course.category}`}>{CATEGORY_LABEL[course.category]}</span>
+        {hasSelected && <span className="badge badge-selected">已确认</span>}
+        {notParticipating && <span className="badge badge-off">不排课</span>}
         <span className="muted">{course.credit} 学分</span>
       </div>
     </div>
@@ -205,13 +209,13 @@ function CourseCard({
 function CourseDetailModal({
   course,
   update,
-  highlightOptionId,
+  highlightOptionIds,
   fixedOptions,
   onClose,
 }: {
   course: Course;
   update: Props['update'];
-  highlightOptionId: string | null;
+  highlightOptionIds: string[];
   fixedOptions: Option[];
   onClose: () => void;
 }) {
@@ -230,12 +234,12 @@ function CourseDetailModal({
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  // 从课表点击进入时，滚动到高亮的候选
+  // 从课表点击进入时，滚动到第一个高亮的候选
   useEffect(() => {
-    if (!highlightOptionId) return;
-    const el = detailRef.current?.querySelector(`[data-option-id="${highlightOptionId}"]`);
+    if (!highlightOptionIds.length) return;
+    const el = detailRef.current?.querySelector(`[data-option-id="${highlightOptionIds[0]}"]`);
     el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  }, [highlightOptionId]);
+  }, [highlightOptionIds]);
 
   return (
     <Modal title={course.name || '(未命名)'} onClose={onClose} className="course-modal">
@@ -298,7 +302,7 @@ function CourseDetailModal({
                 course={course}
                 option={o}
                 update={update}
-                highlighted={o.id === highlightOptionId}
+                highlighted={highlightOptionIds.includes(o.id)}
                 conflict={filterConflicts && isConflict(o)}
               />
             ))}
@@ -319,7 +323,7 @@ function CourseDetailModal({
   );
 }
 
-export default function CoursePanel({ schedule, update, openCourseId, highlightOptionId, onOpenCourse, onCloseCourse }: Props) {
+export default function CoursePanel({ schedule, update, openCourseId, highlightOptionIds, onOpenCourse, onCloseCourse }: Props) {
   const [activeCategories, setActiveCategories] = useState<Set<Category>>(() => new Set(['builtin', 'required', 'elective']));
   const [newName, setNewName] = useState('');
   const [showNonParticipating, setShowNonParticipating] = useState(true);
@@ -414,7 +418,7 @@ export default function CoursePanel({ schedule, update, openCourseId, highlightO
         <CourseDetailModal
           course={openCourse}
           update={update}
-          highlightOptionId={highlightOptionId}
+          highlightOptionIds={highlightOptionIds}
           fixedOptions={fixedOptions}
           onClose={onCloseCourse}
         />

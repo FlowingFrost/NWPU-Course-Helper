@@ -1,5 +1,5 @@
 import type { Schedule, Course, Option, Segment, Category, Meta } from './types';
-import { uid, updateCourse, deleteCourse, addOption, updateOption, setSelected } from './mutations';
+import { uid, updateCourse, deleteCourse, addOption, updateOption, setSelected, setActualSelection } from './mutations';
 import { segmentsEqual } from './segment';
 
 // 结构化命令集合 —— AI 与外部工具都通过它修改课程表（DESIGN.md §9.2）
@@ -13,7 +13,8 @@ export type Command =
   | { op: 'set_willing'; courseId: string; willingOverride: number | null }
   | { op: 'update_course'; courseId: string; patch: Partial<Course> }
   | { op: 'delete_course'; courseId: string }
-  | { op: 'update_meta'; patch: Partial<Meta> };
+  | { op: 'update_meta'; patch: Partial<Meta> }
+  | { op: 'set_actual_selection'; lessonCodes: string[]; courseCodes: string[] };
 
 export function findCourseByOptionId(schedule: Schedule, optionId: string): Course | undefined {
   return schedule.courses.find((c) => c.options.some((o) => o.id === optionId));
@@ -125,6 +126,8 @@ export function applyCommand(schedule: Schedule, cmd: Command): Schedule {
       return deleteCourse(schedule, cmd.courseId);
     case 'update_meta':
       return { ...schedule, meta: { ...schedule.meta, ...cmd.patch } };
+    case 'set_actual_selection':
+      return setActualSelection(schedule, cmd.lessonCodes, cmd.courseCodes);
     default:
       return schedule;
   }

@@ -138,10 +138,11 @@ export function enumerateSchedules(schedule: Schedule, electiveTarget: number | 
   const fixedCredit = fixedCourses.reduce((n, c) => n + c.credit, 0);
   if (fixedCredit > cap) return [];
 
-  // 已被「确认选」的串联组：组内其它课程不再参与排课（只选其一）
+  // 已被「确认选」的串联组：组内其它课程不再参与排课（只选其一）。
+  // 不参与排课的课程不算「已选定」，避免其所在串联组被误判为已敲定。
   const chosenLinkIds = new Set<string>();
   for (const c of schedule.courses) {
-    if (c.linkId && c.options.some((o) => o.selected)) chosenLinkIds.add(c.linkId);
+    if (c.linkId && c.participating !== false && c.options.some((o) => o.selected)) chosenLinkIds.add(c.linkId);
   }
 
   const reqChoices = groupCourses(

@@ -7,7 +7,7 @@ export type ExtMessage =
   | { type: 'IMPORT_LESSONS'; lessons: RawLesson[]; category: Category; selectable?: boolean } // 结构化导入（候选/已选）
   | { type: 'IMPORT_RAW_TEXT'; text: string } // 兜底：原始文本走 /api/parse
   | { type: 'GET_SCHEDULE' } // 拉取当前存档（预览用）
-  | { type: 'APPLY_COMMANDS'; commands: Command[] } // 直接应用结构化命令（更新已选人数等）
+  | { type: 'APPLY_COMMANDS'; commands: Command[] } // 直接应用结构化命令（更新已选课程等）
   | { type: 'PING' } // 探测选课助手是否在线
   | { type: 'OPEN_APP' }; // 打开全屏标签页
 

@@ -1,10 +1,12 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { CSSProperties } from 'react';
-import type { Schedule } from '../../shared/types';
+import type { Schedule, Option, InfoBits } from '../../shared/types';
 import { dayBlocks, layoutBlocks } from '../lib/schedule';
 import type { Item, DayBlock } from '../lib/schedule';
 import { resolveCourseColors, comboColor, minWeekday, tintColor } from '../lib/colors';
 import { DAY_FULL } from '../lib/labels';
+import { DEFAULT_INFO, classBadge, optionSummaryLines } from '../lib/display';
 
 const ROW_H = 52;
 const GAP = 2;
@@ -15,41 +17,118 @@ export default function Timetable({
   weekFilter,
   items,
   className,
-  showInfo = true,
+  info = DEFAULT_INFO,
   showEnrollment = false,
   candidate = false,
   style,
   onBlockClick,
   selectedCourseId = null,
   colors,
+  redCourseIds,
+  includeNonParticipating = false,
+  coInfo = { enabled: true, showTeacher: true, showRoom: true },
+  rowHeight,
+  courseBadges,
+  blockBadges,
 }: {
   schedule: Schedule;
   weekFilter: 'all' | number;
   items?: Item[];
   className?: string;
-  showInfo?: boolean;
+  info?: InfoBits;
   showEnrollment?: boolean;
   candidate?: boolean;
   style?: CSSProperties;
   onBlockClick?: (b: DayBlock) => void;
   selectedCourseId?: string | null;
   colors?: Map<string, string>;
+  redCourseIds?: ReadonlySet<string>; // 标红：这些课程「未完成选课操作」
+  includeNonParticipating?: boolean; // 选课情况弹窗需要展示所有「确认选」课程（含不参与排课的）
+  coInfo?: { enabled: boolean; showTeacher: boolean; showRoom: boolean }; // 不同候选信息叠加
+  rowHeight?: number; // 覆盖每节行高（紧凑展示用）
+  courseBadges?: ReadonlyMap<string, string>; // 课程 → 角标文字（如「单周/双周」）
+  blockBadges?: ReadonlyMap<string, string>; // key=`courseId:day:startNode:endNode` → 窄时段角标（如「第15周」）
 }) {
   const { nodesPerDay, daysPerWeek } = schedule.meta;
-  const rowH = schedule.meta.rowHeight ?? ROW_H;
+  const rowH = rowHeight ?? schedule.meta.rowHeight ?? ROW_H;
   const days = Array.from({ length: daysPerWeek }, (_, i) => i + 1);
   const nodes = Array.from({ length: nodesPerDay }, (_, i) => i + 1);
   const dividerNodes = (schedule.meta.dividerNodes ?? []).filter((n) => n >= 1 && n < nodesPerDay).sort((a, b) => a - b);
   const dividerSet = new Set(dividerNodes);
-  // 第 n 节顶部的 y 坐标（含其上方分割线占位高度）
   const nodeTop = (n: number) => (n - 1) * rowH + dividerNodes.filter((dn) => dn < n).length * DIVIDER_H;
   const totalHeight = nodesPerDay * rowH + dividerNodes.length * DIVIDER_H;
   const srcItems: Item[] = (items ?? schedule.courses.flatMap((c) => c.options.map((o): Item => ({ course: c, option: o }))))
-    .filter((it) => it.course.category === 'builtin' || it.course.participating !== false);
-  const [hoveredCourseId, setHoveredCourseId] = useState<string | null>(null);
+    .filter((it) => includeNonParticipating || it.course.category === 'builtin' || it.course.participating !== false);
 
-  // 均分卡片宽度：对所有课表模式生效（单课表 / 双课表 / 结果叠加层）。
-  // 天列宽按「每天最大重叠课程数」比例分配。
+  const [hoveredCourseId, setHoveredCourseId] = useState<string | null>(null);
+  const [hoveredOptionId, setHoveredOptionId] = useState<string | null>(null);
+  const [hoverBlock, setHoverBlock] = useState<DayBlock | null>(null);
+  const [hoverAnchor, setHoverAnchor] = useState<DOMRect | null>(null);
+  const [coPopupStyle, setCoPopupStyle] = useState<{ left: number; top: number } | null>(null);
+
+  // 注释卡片定位：在「当前块右侧 / 左侧 / 下方 / 上方」四向里，用 Layout 阶段量块尺寸，
+  // 选「遮挡最少的天列块」方向。优先完全不遮挡「被悬停候选其它时间块 + 同时间其它候选块」。
+  const tableRef = useRef<HTMLDivElement>(null);
+  const coPopupRef = useRef<HTMLDivElement>(null);
+
+  const hitsBlocks = (l: number, t: number, w: number, h: number): { coversSelf: boolean; coversOther: number; coversSelfCo: boolean } => {
+    let coversSelf = false;
+    let coversSelfCo = false;
+    let coversOther = 0;
+    if (tableRef.current) {
+      for (const el of Array.from(tableRef.current.querySelectorAll<HTMLElement>('.tt-day .block'))) {
+        const r = el.getBoundingClientRect();
+        const overlap = l < r.right && l + w > r.left && t < r.bottom && t + h > r.top;
+        if (!overlap) continue;
+        const isHovered = el.dataset.opt === hoveredOptionId;
+        const isCo = hoverBlock?.coOptions?.some((co) => el.dataset.opt === co.option.id) ?? false;
+        if (isHovered) coversSelf = true;
+        if (isCo) coversSelfCo = true;
+        if (!isHovered && !isCo) coversOther++;
+      }
+    }
+    return { coversSelf, coversSelfCo, coversOther };
+  };
+
+  useEffect(() => {
+    if (!hoverAnchor || !coPopupRef.current) {
+      setCoPopupStyle(null);
+      return;
+    }
+    const pop = coPopupRef.current;
+    const rect = hoverAnchor;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const pw = pop.offsetWidth;
+    const ph = pop.offsetHeight;
+    const gap = 8;
+    const cands: Array<{ left: number; top: number; coversSelf: boolean; coversSelfCo: boolean; coversOther: number }> = [];
+    const cand = (left: number, top: number) => {
+      const meta = hitsBlocks(left, top, pw, ph);
+      cands.push({ left, top, ...meta });
+    };
+    cand(rect.right + gap, rect.top); // 右
+    cand(rect.left - pw - gap, rect.top); // 左
+    cand(rect.left, rect.bottom + gap); // 下
+    cand(rect.left, rect.top - ph - gap); // 上
+    // 过滤出界
+    const inView = cands.filter((c) => c.left >= 8 && c.top >= 8 && c.left + pw <= vw - 8 && c.top + ph <= vh - 8);
+    const pool = inView.length ? inView : cands.map((c) => ({
+      ...c,
+      left: Math.max(8, Math.min(c.left, vw - pw - 8)),
+      top: Math.max(8, Math.min(c.top, vh - ph - 8)),
+    }));
+    // 排序：先完全不遮自己/同时间，再少遮其它
+    const pick = [...pool].sort((a, b) => {
+      const scoreA = (a.coversSelf || a.coversSelfCo ? 1 : 0) + (a.coversOther > 0 ? 1 : 0);
+      const scoreB = (b.coversSelf || b.coversSelfCo ? 1 : 0) + (b.coversOther > 0 ? 1 : 0);
+      if (scoreA !== scoreB) return scoreA - scoreB;
+      return a.coversOther - b.coversOther;
+    })[0];
+    setCoPopupStyle(pick ? { left: Math.round(pick.left), top: Math.round(pick.top) } : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hoverAnchor]);
+
   const evenCardWidth = schedule.meta.evenCardWidth === true;
   const dayData = days.map((d) => {
     const blocks = layoutBlocks(dayBlocks(srcItems, d, weekFilter));
@@ -64,13 +143,8 @@ export default function Timetable({
     return { day: d, blocks, lanes };
   });
 
-  // 同一课表内课程颜色不重复：灰色/重复颜色自动补齐唯一色。
-  // 双课表右侧传入独立配色（colors），其余模式（单课表/双课表左侧/叠加层）按全部课程配色，保持一致。
   const courseColors = useMemo(() => colors ?? resolveCourseColors(schedule.courses.filter((c) => c.participating !== false)), [colors, schedule.courses]);
-  // 星期组合区分：仅双课表右侧候选课表启用（开关默认开）
   const comboEnabled = candidate && schedule.meta.weekComboColors !== false;
-  // 聚焦淡化（所有课表模式一致）：聚焦课程保持全亮，其余课程块按 focusDimOpacity 降透明度。
-  // focusedCourseId 为唯一聚焦来源：悬停优先，其次为点击选中的课程。
   const dimOpacity = schedule.meta.focusDimOpacity ?? 0.5;
   const focusedCourseId = hoveredCourseId ?? selectedCourseId;
   const dimActive = focusedCourseId != null && srcItems.some((it) => it.course.id === focusedCourseId);
@@ -80,13 +154,11 @@ export default function Timetable({
     if (candidate) {
       return comboEnabled ? comboColor(base, minWeekday(b.option)) : base;
     }
-    // 其它模式（双课表左侧 / 结果叠加层 / 单课表）：固定课与非内置候选都按课程色着色。
-    // 非内置候选仍带 .candidate 的虚线 + 半透明，与固定课（实心）区分视觉层级。
     return base;
   };
 
   return (
-    <div className={`timetable ${className ?? ''}`} style={style}>
+    <div ref={tableRef} className={`timetable ${className ?? ''}`} style={style}>
       <div className="tt-head">
         <div className="tt-time-head">节次</div>
         {dayData.map(({ day, lanes }) => (
@@ -124,39 +196,109 @@ export default function Timetable({
               ))}
               {blocks.map((b) => {
                 const color = borderColor(b);
-                const bg = color ? tintColor(color) : undefined;
+                const red = redCourseIds?.has(b.course.id) ?? false;
+                const border = red ? '#dc2626' : color;
+                const bg = red ? '#fee2e2' : color ? tintColor(color) : undefined;
                 const focused = dimActive && b.course.id === focusedCourseId;
                 const dimmed = dimActive && !focused;
+
+                const coList = b.coOptions ?? [];
+                const showCo = coInfo.enabled && coList.length > 0;
+                const optionHovered =
+                  hoveredOptionId != null &&
+                  (b.option.id === hoveredOptionId || coList.some((co) => co.option.id === hoveredOptionId));
+
+                const candRow = (option: Option, teachers: string[], room: string) => (
+                  <div key={option.id} className="block-cand-row">
+                    <span className="block-badge">{classBadge(option.label)}</span>
+                    {coInfo.showTeacher && teachers.length > 0 && <span className="block-cand-teacher">{teachers.join(' ')}</span>}
+                    {coInfo.showRoom && room && <span className="block-cand-room">{room}</span>}
+                  </div>
+                );
+
                 return (
-                <div
-                  key={b.key}
-                  className={`block ${!candidate && !b.fixed ? 'candidate' : ''}${candidate ? ' cand-table' : ''}${onBlockClick ? ' clickable' : ''}`}
-                  style={{
-                    top: nodeTop(b.startNode) + GAP / 2,
-                    height: nodeTop(b.endNode - 1) + rowH - nodeTop(b.startNode) - GAP,
-                    left: `calc(${(b.lane * 100) / b.laneCount}% + 1px)`,
-                    width: `calc(${100 / b.laneCount}% - 2px)`,
-                    borderLeftColor: color,
-                    background: bg,
-                    opacity: dimmed ? dimOpacity : focused ? 1 : undefined,
-                  }}
-                  title={`${b.course.name} · ${b.teachers.join('/')} · ${b.weekLabel} · ${b.room}`}
-                  onClick={onBlockClick ? () => onBlockClick(b) : undefined}
-                  onMouseEnter={() => setHoveredCourseId(b.course.id)}
-                  onMouseLeave={() => setHoveredCourseId(null)}
-                >
-                  <div className="block-name">{b.course.name}</div>
-                  {showEnrollment && <div className="block-enroll">已选 {b.option.enrolled}/{b.option.capacity}</div>}
-                  {showInfo && b.teachers.length > 0 && <div className="block-meta">{b.teachers.join('/')}</div>}
-                  {showInfo && weekFilter === 'all' && b.weekLabel && <div className="block-meta">{b.weekLabel}</div>}
-                  {showInfo && b.room && <div className="block-meta block-room">{b.room}</div>}
-                </div>
+                  <div
+                    key={b.key}
+                    className={`block ${!candidate && !b.fixed ? 'candidate' : ''}${candidate ? ' cand-table' : ''}${onBlockClick ? ' clickable' : ''}${red ? ' red' : ''}${optionHovered ? ' option-hover' : ''}`}
+                    style={{
+                      top: nodeTop(b.startNode) + GAP / 2,
+                      height: nodeTop(b.endNode - 1) + rowH - nodeTop(b.startNode) - GAP,
+                      left: `calc(${(b.lane * 100) / b.laneCount}% + 1px)`,
+                      width: `calc(${100 / b.laneCount}% - 2px)`,
+                      borderLeftColor: border,
+                      background: bg,
+                      opacity: dimmed ? dimOpacity : focused ? 1 : undefined,
+                    }}
+                    title={`${b.course.name} · ${[b.teachers, ...coList.map((co) => co.teachers)].map((ts) => ts.join(' ')).filter(Boolean).join(' / ')} · ${b.weekLabel} · ${b.room}${red ? ' · 未完成选课' : ''}`}
+                    onClick={onBlockClick ? () => onBlockClick(b) : undefined}
+                    data-opt={b.option.id}
+                    onMouseEnter={(e) => {
+                      setHoveredCourseId(b.course.id);
+                      setHoveredOptionId(b.option.id);
+                      setHoverBlock(b);
+                      setHoverAnchor((e.currentTarget as HTMLElement).getBoundingClientRect());
+                    }}
+                    onMouseLeave={() => {
+                      setHoveredCourseId(null);
+                      setHoveredOptionId(null);
+                      setHoverBlock(null);
+                      setHoverAnchor(null);
+                    }}
+                  >
+                    <div className="block-name">
+                      {b.course.name}
+                      {courseBadges?.get(b.course.id) && <span className="block-parity">{courseBadges.get(b.course.id)}</span>}
+                      {blockBadges?.get(`${b.course.id}:${day}:${b.startNode}:${b.endNode}`) && (
+                        <span className="block-parity">{blockBadges.get(`${b.course.id}:${day}:${b.startNode}:${b.endNode}`)}</span>
+                      )}
+                    </div>
+                    {red && <div className="block-red-tag">未完成</div>}
+                    {showEnrollment && <div className="block-enroll">已选 {b.option.enrolled}/{b.option.capacity}</div>}
+                    {info.week && weekFilter === 'all' && b.weekLabel && <div className="block-meta">{b.weekLabel}</div>}
+                    {showCo ? (
+                      <>
+                        {candRow(b.option, b.teachers, b.room)}
+                        {coList.map((co) => candRow(co.option, co.teachers, co.room))}
+                      </>
+                    ) : (
+                      <>
+                        {info.teacher && b.teachers.length > 0 && <div className="block-meta">{b.teachers.join(' ')}</div>}
+                        {info.room && b.room && <div className="block-meta block-room">{b.room}</div>}
+                      </>
+                    )}
+                  </div>
                 );
               })}
             </div>
           );
         })}
       </div>
+
+      {hoverBlock && hoverBlock.coOptions && hoverBlock.coOptions.length > 0 &&
+        createPortal(
+          <div
+            ref={coPopupRef}
+            className={`hover-annotation${coPopupStyle ? '' : ' measuring'}`}
+            style={coPopupStyle ? { left: coPopupStyle.left, top: coPopupStyle.top } : { left: -10000, top: -10000 }}
+          >
+            {hoverBlock.coOptions.map((co) => (
+              <div key={co.option.id} className="hover-annotation-group">
+                <div className="hover-annotation-head">
+                  <span className="hover-annotation-badge">{classBadge(co.option.label)}</span>
+                  {co.option.label && <span className="hover-annotation-label">{co.option.label}</span>}
+                </div>
+                <div className="hover-annotation-lines">
+                  {optionSummaryLines(co.option).map((line, i) => (
+                    <div key={i} className="hover-annotation-line">
+                      {line}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

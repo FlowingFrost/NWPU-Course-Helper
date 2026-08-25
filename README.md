@@ -47,6 +47,13 @@ npm run build:ext     # 打包到 extension/dist/
 
 ## 更多
 
+- **开发文档（面向 AI / 新开发者，代码地图 + 扩展手册）：[docs/开发指南.md](docs/开发指南.md)**
 - 功能与使用说明、意愿值/评分算法、插件开发、FAQ：[开发说明.md](开发说明.md)
 - AI / 外部工具接口：[docs/AI接口协议.md](docs/AI接口协议.md)
 - 完整设计稿：[DESIGN.md](DESIGN.md)
+
+创建分发
+```bash
+npm run pack:src -- --version v0.2.5alpha
+npm run pack:win
+```

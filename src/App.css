@@ -1,5 +1,10 @@
+:root {
+  --sidebar-w: 64px;
+}
+
 .app {
   padding: 16px;
+  margin-left: var(--sidebar-w);
   display: flex;
   flex-direction: column;
   min-height: 100vh;
@@ -283,6 +288,42 @@
   color: #94a3b8;
 }
 
+/* 悬停候选：其所有时间段的文字变蓝，与其它候选区分 */
+.block.option-hover .block-name,
+.block.option-hover .block-meta,
+.block.option-hover .block-enroll,
+.block.option-hover .block-room {
+  color: #1d4ed8;
+}
+
+/* 同时间多候选提示徽标 */
+.block-co-hint {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: rgba(29, 78, 216, 0.12);
+  color: #1d4ed8;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.3;
+  vertical-align: 1px;
+}
+
+/* 悬停时注释其它候选信息 */
+.block-co {
+  margin-top: 3px;
+  padding-top: 3px;
+  border-top: 1px dashed rgba(29, 78, 216, 0.4);
+}
+
+.block-co-item {
+  font-size: 10px;
+  color: #1d4ed8;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+
 .tt-divider {
   position: absolute;
   left: 0;
@@ -403,6 +444,25 @@ button.danger {
   border: 1px solid #e5e7eb;
   border-radius: 6px;
   overflow: hidden;
+}
+
+/* 有确认选候选的课程：蓝边标识 */
+.course-card.selected {
+  border-color: #1d4ed8;
+  box-shadow: inset 0 0 0 1px #1d4ed8;
+}
+
+/* 不参与排课的课程：淡化 */
+.course-card.off {
+  opacity: 0.55;
+}
+
+.badge-selected {
+  background: #1d4ed8;
+}
+
+.badge-off {
+  background: #9ca3af;
 }
 
 .course-row {
@@ -712,9 +772,10 @@ button.danger {
   padding: 1px 4px;
   font-size: 11px;
   line-height: 1.4;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-all;
+  overflow-wrap: anywhere;
   overflow: hidden;
-  text-overflow: ellipsis;
   border-radius: 2px;
 }
 
@@ -1085,4 +1146,951 @@ button.danger {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* 课表块标红（选课情况：未完成选课操作） */
+.block.red {
+  border-left-color: #dc2626;
+}
+
+.block-red-tag {
+  color: #b91c1c;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+button.primary {
+  background: #1d4ed8;
+  color: #fff;
+  border-color: #1d4ed8;
+}
+
+button.primary:hover {
+  background: #1e40af;
+}
+
+/* —— 目标清单（弹窗） —— */
+.modal.goal-modal {
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+}
+
+.goal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.goal-summary {
+  font-size: 12px;
+}
+
+.goal-summary-hint {
+  color: #9ca3af;
+  margin-left: 6px;
+}
+
+.goal-add {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.goal-add-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.goal-add-btn {
+  width: 100%;
+  border: 1px dashed #d1d5db;
+  background: transparent;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.goal-add-btn:hover {
+  background: #f9fafb;
+}
+
+.goal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 60vh;
+  overflow: auto;
+}
+
+.goal-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.goal-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.goal-item:hover {
+  background: #f9fafb;
+}
+
+.goal-members {
+  border-top: 1px solid #f1f5f9;
+  background: #fafafa;
+  padding: 4px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.goal-member {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 3px 0;
+  min-width: 0;
+}
+
+.goal-member-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+.goal-member-toggle input {
+  margin: 0;
+}
+
+.goal-member-name {
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.goal-member-sel {
+  font-size: 10px;
+  color: #15803d;
+  background: #dcfce7;
+  padding: 0 5px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.goal-state {
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.goal-state.none {
+  background: #e5e7eb;
+  color: #4b5563;
+}
+
+.goal-state.pending {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.goal-state.done {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.goal-name {
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.goal-target {
+  font-size: 11px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.goal-del {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: #b91c1c;
+  padding: 0 4px;
+  cursor: pointer;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+/* —— 选课情况（弹窗） —— */
+.modal.selection-modal {
+  width: calc(100vw - 96px);
+  max-width: none;
+  height: calc(100vh - 96px);
+  max-height: calc(100vh - 96px);
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+}
+
+.selection-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  gap: 12px;
+}
+
+.selection-left {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.selection-left .timetable {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.selection-summary {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+
+.selection-warn {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.selection-unknown {
+  color: #b45309;
+}
+
+.selection-hint {
+  font-size: 12px;
+  color: #b45309;
+  background: #fef3c7;
+  border: 1px solid #fde68a;
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+
+.selection-right {
+  width: 380px;
+  flex-shrink: 0;
+  border-left: 1px solid #e5e7eb;
+  padding-left: 12px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.selection-right-head {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 6px;
+}
+
+.selection-table {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.selection-th,
+.selection-tr {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 52px 64px 76px;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+  padding: 4px 2px;
+}
+
+.selection-th {
+  color: #6b7280;
+  font-weight: 600;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  background: #fff;
+}
+
+.selection-tr {
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.selection-tr.row-missing {
+  background: #fef2f2;
+}
+
+.selection-course {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.selection-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selection-label {
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selection-willing,
+.selection-enroll {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.badge-inline {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #64748b;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.v-status {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  text-align: center;
+  white-space: nowrap;
+  justify-self: start;
+}
+
+.v-status.done {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.v-status.missing {
+  background: #fee2e2;
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.v-status.unknown {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+/* —— 侧边栏（左侧图标栏，不可折叠） —— */
+.sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--sidebar-w);
+  background: #fff;
+  border-right: 1px solid #e5e7eb;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 6px;
+}
+
+.sidebar-brand {
+  width: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  line-height: 1;
+  padding: 10px 0;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.sidebar-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.sidebar-group.bottom {
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.sidebar-btn {
+  width: 48px;
+  height: 48px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 0;
+  transition: background 0.12s ease;
+}
+
+.sidebar-btn .s-icon {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.sidebar-btn .s-label {
+  font-size: 10px;
+  color: #6b7280;
+}
+
+.sidebar-btn:hover {
+  background: #f3f4f6;
+}
+
+.sidebar-btn.active {
+  background: #1d4ed8;
+  border-radius: 6px;
+}
+
+.sidebar-btn.active .s-label {
+  color: #fff;
+}
+
+/* Alt 预览命中的 tab：与「常驻 active」区分（浅蓝 + 描边） */
+.sidebar-btn.alt {
+  background: #eff6ff;
+  box-shadow: inset 0 0 0 2px #3b82f6;
+  border-radius: 6px;
+}
+
+.sidebar-btn.alt .s-label {
+  color: #1d4ed8;
+}
+
+/* —— 侧边栏弹窗层 —— */
+.panel-overlay {
+  position: fixed;
+  left: var(--sidebar-w);
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.32);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow: auto;
+}
+
+.panel-overlay.previewing {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* Alt 预览：窗口仅展示，不可交互 */
+.panel-overlay.previewing .panel-window {
+  pointer-events: none;
+}
+
+.panel-window {
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+  width: 100%;
+  max-width: 560px;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-window-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.panel-window-head h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.panel-close {
+  border: none;
+  background: transparent;
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 8px;
+  cursor: pointer;
+  color: #6b7280;
+}
+
+.panel-close:hover {
+  color: #111827;
+}
+
+.panel-window-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* 目标清单窗口 */
+.panel-window.goal-panel {
+  max-width: 560px;
+}
+
+/* 选课情况窗口：宽幅铺满 */
+.panel-window.selection-panel {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: 100%;
+}
+
+.panel-window.selection-panel .panel-window-body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 设置窗口 */
+.panel-window.settings-panel {
+  max-width: 720px;
+  max-height: 85vh;
+}
+
+/* 存档窗口 */
+.panel-window.save-panel {
+  max-width: 420px;
+}
+
+.save-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.save-current {
+  font-size: 12px;
+}
+
+.save-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* —— 不同候选信息叠加（N班徽标 + 教师 + 地点） —— */
+.block-cand-row {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 10px;
+  line-height: 1.35;
+  flex-wrap: wrap;
+}
+
+.block-badge {
+  display: inline-block;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: rgba(29, 78, 216, 0.14);
+  color: #1d4ed8;
+  font-weight: 700;
+  font-size: 9px;
+  line-height: 1.5;
+  flex-shrink: 0;
+}
+
+.block-cand-teacher {
+  color: #475569;
+}
+
+.block-cand-room {
+  color: #94a3b8;
+}
+
+/* —— 悬停候选的注释卡片（浮在候选旁） —— */
+.hover-annotation {
+  position: fixed;
+  z-index: 400;
+  max-width: 340px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #0f172a;
+  pointer-events: none;
+}
+
+.hover-annotation.measuring {
+  visibility: hidden;
+}
+
+.hover-annotation-group {
+  padding: 4px 0;
+}
+
+.hover-annotation-group + .hover-annotation-group {
+  border-top: 1px solid #f1f5f9;
+}
+
+.hover-annotation-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.hover-annotation-badge {
+  display: inline-block;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: rgba(29, 78, 216, 0.14);
+  color: #1d4ed8;
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.hover-annotation-label {
+  color: #6b7280;
+  font-size: 11px;
+}
+
+.hover-annotation-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.hover-annotation-line {
+  color: #374151;
+}
+
+/* —— 设置页面（全屏） —— */
+.settings-overlay {
+  position: fixed;
+  left: var(--sidebar-w);
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background: #fff;
+  z-index: 40;
+  overflow: auto;
+}
+
+.settings-page {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 24px 32px 48px;
+}
+
+.settings-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 16px;
+}
+
+.settings-head h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.info-config-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 8px;
+}
+
+.info-config-table th,
+.info-config-table td {
+  border: 1px solid #e5e7eb;
+  padding: 6px 10px;
+  text-align: center;
+  font-size: 12px;
+}
+
+.info-config-table th {
+  background: #f9fafb;
+  font-weight: 600;
+  color: #374151;
+}
+
+.info-config-table td:first-child {
+  text-align: left;
+}
+
+.info-config-table input[type='checkbox'] {
+  margin: 0;
+}
+
+/* —— 课表详情页（全屏） —— */
+.details-overlay {
+  position: fixed;
+  left: var(--sidebar-w);
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background: #fff;
+  z-index: 40;
+  overflow: auto;
+}
+
+.details-page {
+  max-width: none;
+  margin: 0;
+  padding: 16px 20px 40px;
+}
+
+.details-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 16px;
+}
+
+.details-head h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.details-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.partition-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.partition-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 8px;
+  background: #fff;
+}
+
+.partition-head {
+  font-weight: 700;
+  font-size: 13px;
+  color: #1d4ed8;
+  margin-bottom: 6px;
+}
+
+.heatmap {
+  display: grid;
+  gap: 1px;
+  background: #e5e7eb;
+  border: 1px solid #e5e7eb;
+  max-width: 720px;
+}
+
+.heat-cell {
+  background: #fff;
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.heat-head {
+  background: #f9fafb;
+}
+
+.heat-time {
+  color: #9ca3af;
+}
+
+.heat-val {
+  font-size: 10px;
+}
+
+.gantt {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.gantt-header {
+  display: flex;
+}
+
+.gantt-corner {
+  flex-shrink: 0;
+}
+
+.gantt-weeks {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+}
+
+.gantt-week {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.gantt-row {
+  display: flex;
+  align-items: stretch;
+  margin-top: 4px;
+}
+
+.gantt-day {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.gantt-track {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.gantt-bar {
+  position: absolute;
+  border-left: 3px solid #94a3b8;
+  border-radius: 4px;
+  padding: 0 4px;
+  font-size: 11px;
+  line-height: 18px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #0f172a;
+}
+
+/* 设置页：按 tab 功能区的一级分类标题 */
+.settings-category {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1d4ed8;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 6px;
+  margin-top: 22px;
+}
+
+.settings-category:first-child {
+  margin-top: 0;
+}
+
+/* 详情课表：散课的「单/双周」角标 */
+.block-parity {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: rgba(29, 78, 216, 0.14);
+  color: #1d4ed8;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.4;
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+
+/* 周段课表标题行 + 展示方式切换 */
+.partition-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.partition-mode-btn {
+  border: 1px solid #d1d5db;
+  background: #fff;
+  border-radius: 6px;
+  padding: 2px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  color: #374151;
+}
+
+.partition-mode-btn:hover {
+  background: #f3f4f6;
+}
+
+/* 水平模式：单行横向滑动 */
+.partition-grid.horizontal {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  align-items: stretch;
+}
+
+.partition-grid.horizontal .partition-card {
+  flex: 0 0 auto;
+  width: 460px;
 }

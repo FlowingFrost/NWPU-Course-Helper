@@ -71,3 +71,27 @@ export function extractSelectionLessons(doc: Document): SelectionLesson[] {
     .map(elTableRowToSelectionLesson)
     .filter((r): r is SelectionLesson => r != null);
 }
+
+// 「已选课程」tab 里的一行：实际已完成选课操作的教学班引用（用于前端「选课情况」标红校验）。
+export interface SelectedLessonRef {
+  courseCode: string;
+  lessonCode: string;
+  courseName: string;
+}
+
+export function elTableRowToSelectedLesson(tr: Element): SelectedLessonRef | null {
+  const lesson = elTableRowToRawLesson(tr);
+  if (!lesson) return null;
+  return { courseCode: lesson.courseCode, lessonCode: lesson.lessonCode, courseName: lesson.courseName };
+}
+
+// 从「已选课程」tab 收集实际已选的教学班编号。
+// 该 tab 的表格结构与「全部课程」一致（.course-name/.lesson-code 等 class 选择器），
+// 区别仅在于状态列为 .drop-label「已选中」，无需过滤即可全部收集。
+// 直接以 #selected-lesson 容器为作用域，避免误收其它隐藏 tab 的表格行。
+export function extractSelectedLessonsFromDom(doc: Document): SelectedLessonRef[] {
+  const root = doc.getElementById('selected-lesson') ?? doc;
+  return Array.from(root.querySelectorAll('tr.el-table__row'))
+    .map(elTableRowToSelectedLesson)
+    .filter((r): r is SelectedLessonRef => r != null);
+}

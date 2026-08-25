@@ -48,6 +48,16 @@ export interface TeacherRating {
   rating: number;
 }
 
+// 显示课程信息的内容位（教师/周次/地点）
+export interface InfoBits {
+  teacher: boolean;
+  week: boolean;
+  room: boolean;
+}
+
+// 显示课程信息适用的视图
+export type InfoView = 'single' | 'dualLeft' | 'dualRight' | 'plugin';
+
 export interface Meta {
   school: string;
   term: string;
@@ -62,6 +72,35 @@ export interface Meta {
   rowHeight?: number; // 课表每节行高（px），默认 52
   evenCardWidth?: boolean; // 双课表右侧：按每天最大重叠课程数均分卡片宽度（天列宽按比例分配）
   focusDimOpacity?: number; // 双课表右侧：点击某候选后，其它课程块的透明度（0~1，默认 0.5）
+  // —— 显示偏好（持久化到存档，插件预览小课表复用同一套规则） ——
+  viewMode?: 'single' | 'double'; // 单/双课表
+  showEnrollment?: boolean; // 显示已选人数/容量
+  showElectives?: boolean; // 显示非必修
+  filterConflicts?: boolean; // 过滤冲突课程（双课表右侧/预览）
+  hideSelectedCandidates?: boolean; // 已选中的课不再显示其它候选（默认开启）
+  // 显示课程信息（教师/周次/地点）：按视图独立配置，缺省即整组默认
+  infoConfig?: Partial<Record<InfoView, Partial<InfoBits>>>;
+  // 不同候选信息叠加显示：总开关 + 显示教师 + 显示地点
+  coInfo?: { enabled?: boolean; showTeacher?: boolean; showRoom?: boolean };
+  // 周段优化显示：true=按「课程集合相同的周」合并分组，false=独立显示（连续周段拆开）
+  optimizeWeeks?: boolean;
+}
+
+// 目标清单：一条「需要完成选课」的记录。target 指向一个课程编号或一个串联组标识。
+export type GoalTargetType = 'course' | 'link';
+
+export interface Goal {
+  id: string;
+  name: string; // 显示名（默认取课程名 / 串联组名）
+  target: string; // 课程编号 或 串联组标识（linkId）
+  targetType: GoalTargetType;
+}
+
+// 教务「已选课程」页抓取结果：实际已完成选课操作的课程/教学班编号快照。
+export interface ActualSelection {
+  updatedAt: number; // 抓取时间戳（毫秒）
+  lessonCodes: string[]; // 实际已选的教学班编号（option.label 精确匹配）
+  courseCodes: string[]; // 实际已选的课程编号（无教学班编号时的兜底匹配）
 }
 
 export interface Schedule {
@@ -69,6 +108,8 @@ export interface Schedule {
   nodeTimes: NodeTime[];
   teacherRatings: TeacherRating[];
   courses: Course[];
+  goals?: Goal[]; // 目标清单（选课进度追踪）
+  actualSelection?: ActualSelection; // 教务「已选课程」同步结果
 }
 
 export interface Settings {

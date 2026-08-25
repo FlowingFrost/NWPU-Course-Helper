@@ -1,4 +1,4 @@
-import type { Schedule, Course, Option, Segment, Category } from './types';
+import type { Schedule, Course, Option, Segment, Category, Goal, GoalTargetType, ActualSelection } from './types';
 
 export function uid(prefix = 'id'): string {
   return `${prefix}_${crypto.randomUUID().slice(0, 8)}`;
@@ -119,4 +119,37 @@ export function removeSegment(s: Schedule, courseId: string, optionId: string, i
       options: c.options.map((o) => (o.id === optionId ? { ...o, segments: o.segments.filter((_, i) => i !== index) } : o)),
     };
   });
+}
+
+// —— 目标清单 ——
+
+function mapGoals(s: Schedule, fn: (goals: Goal[]) => Goal[]): Schedule {
+  return { ...s, goals: fn(s.goals ?? []) };
+}
+
+export function addGoal(s: Schedule, partial: Partial<Goal> & { target: string; targetType: GoalTargetType }): Schedule {
+  const goal: Goal = {
+    id: uid('goal'),
+    name: partial.target,
+    ...partial,
+  };
+  return mapGoals(s, (gs) => [...gs, goal]);
+}
+
+export function updateGoal(s: Schedule, goalId: string, patch: Partial<Goal>): Schedule {
+  return mapGoals(s, (gs) => gs.map((g) => (g.id === goalId ? { ...g, ...patch } : g)));
+}
+
+export function deleteGoal(s: Schedule, goalId: string): Schedule {
+  return mapGoals(s, (gs) => gs.filter((g) => g.id !== goalId));
+}
+
+// 教务「已选课程」同步结果写入存档（由插件 set_actual_selection 命令调用）
+export function setActualSelection(s: Schedule, lessonCodes: string[], courseCodes: string[]): Schedule {
+  const actualSelection: ActualSelection = {
+    updatedAt: Date.now(),
+    lessonCodes: [...new Set(lessonCodes.map((x) => x.trim()).filter(Boolean))],
+    courseCodes: [...new Set(courseCodes.map((x) => x.trim()).filter(Boolean))],
+  };
+  return { ...s, actualSelection };
 }

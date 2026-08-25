@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSchedule } from './hooks/useSchedule';
 import { useViewState } from './hooks/useViewState';
 import { useDualSplit } from './hooks/useDualSplit';
@@ -10,29 +10,42 @@ import SettingsPanel from './components/SettingsPanel';
 import SavePicker from './components/SavePicker';
 import ResultsSection from './components/Results';
 import ParseInput from './components/ParseInput';
+import GoalList from './components/GoalList';
+import SelectionStatus from './components/SelectionStatus';
+import ScheduleDetails from './components/ScheduleDetails';
+import Sidebar from './components/Sidebar';
 import { Modal } from './components/Modal';
 import { enumerateSchedules, optionsConflict } from './lib/algo';
 import { resolveCourseColors } from './lib/colors';
 import { fixedItems, candidateItems } from './lib/schedule';
+import { infoOf, coInfoOf } from './lib/display';
+import { TOP_TABS, SIDEBAR_TAB_H, type PanelId, type TopTabId } from './lib/nav';
 import type { ScheduleResult } from './lib/algo';
+import type { Meta } from '../shared/types';
 import './App.css';
 
 export default function App() {
   const { schedule, error, saving, update, setAndSave, replace } = useSchedule();
+  const patchMeta = useCallback(
+    (patch: Partial<Meta>) => {
+      update((s) => ({ ...s, meta: { ...s.meta, ...patch } }));
+    },
+    [update],
+  );
   const {
     viewMode,
     setViewMode,
     overlayOn,
     setOverlayOn,
-    showInfo,
-    setShowInfo,
     showEnrollment,
     setShowEnrollment,
     showElectives,
     setShowElectives,
     filterConflicts,
     setFilterConflicts,
-  } = useViewState();
+    hideSelectedCandidates,
+    setHideSelectedCandidates,
+  } = useViewState(schedule?.meta, patchMeta);
   const { dualRatio, dragging, dualRef, startDrag, resetDualRatio } = useDualSplit();
   const { selection, selectedCourseId, handleBlockClick, openCourse, closeCourse } = useCourseSelection();
   const { importPrompt, onImport, confirmImport, closeImport } = useWakeUpImport(schedule, setAndSave);
@@ -42,6 +55,60 @@ export default function App() {
   const [results, setResults] = useState<ScheduleResult[] | null>(null);
   const [activeResult, setActiveResult] = useState<ScheduleResult | null>(null);
 
+  // 侧边栏面板（互斥单选）：home 无弹窗，其余各一个窗口
+  const [activePanel, setActivePanel] = useState<PanelId>('home');
+  // Alt 预览：按住 Alt + 上下移动鼠标临时切换顶部 tab，仅预览、不可交互，松 Alt 回到 activePanel
+  const [previewTab, setPreviewTab] = useState<TopTabId | null>(null);
+
+  const activePanelRef = useRef(activePanel);
+  useEffect(() => {
+    activePanelRef.current = activePanel;
+  }, [activePanel]);
+  const mouseYRef = useRef(0);
+  const altStateRef = useRef<{ startY: number; baseIndex: number } | null>(null);
+
+  // Alt 手势：按住 Alt 后，鼠标上下位移 1:1 映射到顶部 tab（起终点不同，位移量相同）
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      mouseYRef.current = e.clientY;
+      const st = altStateRef.current;
+      if (!st) return;
+      const dy = e.clientY - st.startY;
+      const idx = Math.max(0, Math.min(TOP_TABS.length - 1, st.baseIndex + Math.round(dy / SIDEBAR_TAB_H)));
+      setPreviewTab(TOP_TABS[idx]);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Alt') return;
+      if (altStateRef.current) return;
+      e.preventDefault(); // 尽量阻止浏览器菜单栏焦点
+      const cur = activePanelRef.current;
+      const baseIdx = TOP_TABS.indexOf(cur as TopTabId);
+      altStateRef.current = { startY: mouseYRef.current, baseIndex: baseIdx >= 0 ? baseIdx : 0 };
+      setPreviewTab(TOP_TABS[altStateRef.current.baseIndex]);
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key !== 'Alt') return;
+      if (!altStateRef.current) return;
+      altStateRef.current = null;
+      setPreviewTab(null);
+    };
+    // 焦点丢失（如 Alt 按住时切到别处）时兜底退出预览，避免卡在「仅预览」状态
+    const onBlur = () => {
+      altStateRef.current = null;
+      setPreviewTab(null);
+    };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
+    };
+  }, []);
+
   if (error) return <div className="app-error">加载失败：{error}</div>;
   if (!schedule) return <div className="app-loading">加载中…</div>;
 
@@ -50,31 +117,40 @@ export default function App() {
     setOverlayOn(true);
   };
 
-  // 单课表条目：按「显示非必修」过滤
+  // 单课表条目：按开关隐藏已选课程的其它候选；再按「显示非必修」过滤
   const singleItems = schedule.courses
     .flatMap((c) => c.options.map((o) => ({ course: c, option: o })))
+    .filter((it) => it.option.selected || !hideSelectedCandidates || !it.course.options.some((o) => o.selected))
     .filter((it) => showElectives || it.course.category !== 'elective');
 
-  // 双课表右侧条目：按「显示非必修」+「过滤冲突课程」过滤
+  // 双课表右侧条目：按开关隐藏已选课程的其它候选；再按「显示非必修」+「过滤冲突课程」过滤
   const fixedOpts = fixedItems(schedule).map((it) => it.option);
-  const rightItems = candidateItems(schedule)
+  const rightItems = candidateItems(schedule, hideSelectedCandidates)
     .filter((it) => showElectives || it.course.category !== 'elective')
     .filter((it) => !filterConflicts || !fixedOpts.some((fo) => optionsConflict(it.option, fo)));
 
-  // 双课表右侧独立着色：只对右侧候选课程重新做黄金角分配，充分利用整个色相环，
-  // 避免右侧与左侧共用整套配色而被挤到同一小段色相（蓝紫扎堆）。
-  // 左侧/单课表仍用 resolveCourseColors(全部课程)，保持与之前完全一致。
   const rightCourses = Array.from(new Map(rightItems.map((it) => [it.course.id, it.course])).values()).filter(
-    (c) => c.participating !== false
+    (c) => c.participating !== false,
   );
   const rightColors = resolveCourseColors(rightCourses);
 
+  // 显示课程信息按视图独立配置；不同候选信息叠加全局配置
+  const infoSingle = infoOf(schedule.meta, 'single');
+  const infoDualLeft = infoOf(schedule.meta, 'dualLeft');
+  const infoDualRight = infoOf(schedule.meta, 'dualRight');
+  const coInfo = coInfoOf(schedule.meta);
+
+  // 有效面板：Alt 预览时显示预览 tab（不可交互），否则显示 activePanel
+  const previewing = previewTab !== null;
+  const effectivePanel: PanelId = previewing ? (previewTab as PanelId) : activePanel;
+  const closePanel = () => setActivePanel('home');
+
   return (
     <div className="app">
+      <Sidebar activePanel={activePanel} previewTab={previewTab} onSelect={setActivePanel} />
+
       <header className="topbar">
         <h1>{schedule.meta.school}选课助手</h1>
-        <SavePicker currentTerm={schedule.meta.term} onSchedule={replace} />
-        <span className="topbar-sep" />
         <select
           value={weekFilter === 'all' ? 'all' : String(weekFilter)}
           onChange={(e) => setWeekFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
@@ -90,16 +166,16 @@ export default function App() {
           {viewMode === 'single' ? '双课表' : '单课表'} (D)
         </button>
         <label className="overlay-toggle">
-          <input type="checkbox" checked={showInfo} onChange={(e) => setShowInfo(e.target.checked)} />
-          显示课程信息
-        </label>
-        <label className="overlay-toggle">
           <input type="checkbox" checked={showEnrollment} onChange={(e) => setShowEnrollment(e.target.checked)} />
           显示已选人数/容量
         </label>
         <label className="overlay-toggle">
           <input type="checkbox" checked={showElectives} onChange={(e) => setShowElectives(e.target.checked)} />
           显示非必修
+        </label>
+        <label className="overlay-toggle">
+          <input type="checkbox" checked={hideSelectedCandidates} onChange={(e) => setHideSelectedCandidates(e.target.checked)} />
+          隐藏已选课其它候选
         </label>
         {viewMode === 'double' && (
           <label className="overlay-toggle">
@@ -116,7 +192,6 @@ export default function App() {
           />
           结果叠加层 (R)
         </label>
-        <SettingsPanel schedule={schedule} update={update} onResetDualRatio={resetDualRatio} onImportWakeUp={onImport} />
         <span className={`save ${saving ? '' : 'ok'}`}>{saving ? '保存中…' : '已保存'}</span>
         <ParseInput onSchedule={replace} />
       </header>
@@ -124,7 +199,7 @@ export default function App() {
       <div className="main">
         {viewMode === 'single' ? (
           <div className="timetable-zone">
-            <Timetable schedule={schedule} weekFilter={weekFilter} items={singleItems} showInfo={showInfo} showEnrollment={showEnrollment} onBlockClick={handleBlockClick} />
+            <Timetable schedule={schedule} weekFilter={weekFilter} items={singleItems} info={infoSingle} coInfo={coInfo} showEnrollment={showEnrollment} onBlockClick={handleBlockClick} />
             {overlayOn && activeResult && (
               <div className="overlay">
                 <div className="overlay-backdrop" onClick={() => setOverlayOn(false)} />
@@ -133,20 +208,20 @@ export default function App() {
                     结果预览 #{' '}
                     {results ? results.indexOf(activeResult) + 1 : '?'}
                   </div>
-                  <Timetable schedule={schedule} weekFilter={weekFilter} items={activeResult.items} className="overlay-table" showInfo={showInfo} showEnrollment={showEnrollment} onBlockClick={handleBlockClick} />
+                  <Timetable schedule={schedule} weekFilter={weekFilter} items={activeResult.items} className="overlay-table" info={infoSingle} coInfo={coInfo} showEnrollment={showEnrollment} onBlockClick={handleBlockClick} />
                 </div>
               </div>
             )}
           </div>
         ) : (
           <div className="dual" ref={dualRef}>
-            <Timetable schedule={schedule} weekFilter={weekFilter} items={fixedItems(schedule)} showInfo={showInfo} showEnrollment={showEnrollment} style={{ flex: `${dualRatio} 1 0%` }} onBlockClick={handleBlockClick} />
+            <Timetable schedule={schedule} weekFilter={weekFilter} items={fixedItems(schedule)} info={infoDualLeft} coInfo={coInfo} showEnrollment={showEnrollment} style={{ flex: `${dualRatio} 1 0%` }} onBlockClick={handleBlockClick} />
             <div
               className={`dual-divider${dragging ? ' dragging' : ''}`}
               title={`左表 ${Math.round(dualRatio * 100)}% · 拖动调整`}
               onPointerDown={startDrag}
             />
-            <Timetable schedule={schedule} weekFilter={weekFilter} items={rightItems} colors={rightColors} showInfo={showInfo} showEnrollment={showEnrollment} candidate style={{ flex: `${1 - dualRatio} 1 0%` }} onBlockClick={handleBlockClick} selectedCourseId={selectedCourseId} />
+            <Timetable schedule={schedule} weekFilter={weekFilter} items={rightItems} colors={rightColors} info={infoDualRight} coInfo={coInfo} showEnrollment={showEnrollment} candidate style={{ flex: `${1 - dualRatio} 1 0%` }} onBlockClick={handleBlockClick} selectedCourseId={selectedCourseId} />
           </div>
         )}
       </div>
@@ -157,7 +232,7 @@ export default function App() {
             schedule={schedule}
             update={update}
             openCourseId={selection?.courseId ?? null}
-            highlightOptionId={selection?.optionId ?? null}
+            highlightOptionIds={selection?.optionIds ?? []}
             onOpenCourse={openCourse}
             onCloseCourse={closeCourse}
           />
@@ -188,6 +263,38 @@ export default function App() {
             <button onClick={closeImport}>取消</button>
           </div>
         </Modal>
+      )}
+
+      {effectivePanel === 'settings' && (
+        <SettingsPanel
+          schedule={schedule}
+          update={update}
+          onClose={closePanel}
+          onResetDualRatio={resetDualRatio}
+          onImportWakeUp={onImport}
+        />
+      )}
+
+      {effectivePanel === 'details' && <ScheduleDetails schedule={schedule} onClose={closePanel} />}
+
+      {effectivePanel !== 'home' && effectivePanel !== 'settings' && effectivePanel !== 'details' && (
+        <div className={`panel-overlay${previewing ? ' previewing' : ''}`} onClick={previewing ? undefined : closePanel}>
+          {effectivePanel === 'goals' && (
+            <GoalList
+              schedule={schedule}
+              update={update}
+              onClose={closePanel}
+              onLocate={(courseId) => {
+                openCourse(courseId);
+                closePanel();
+              }}
+            />
+          )}
+          {effectivePanel === 'selection' && <SelectionStatus schedule={schedule} onClose={closePanel} />}
+          {effectivePanel === 'saves' && (
+            <SavePicker currentTerm={schedule.meta.term} onSchedule={replace} onClose={closePanel} />
+          )}
+        </div>
       )}
     </div>
   );

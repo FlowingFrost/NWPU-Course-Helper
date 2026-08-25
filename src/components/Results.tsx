@@ -2,7 +2,7 @@ import { Fragment, useMemo } from 'react';
 import type { Schedule } from '../../shared/types';
 import type { ScheduleResult } from '../lib/algo';
 import { diagnoseNoSolution } from '../lib/algo';
-import { itemsInCell } from '../lib/schedule';
+import { dayBlocks } from '../lib/schedule';
 import { resolveCourseColors } from '../lib/colors';
 import { DAY_SHORT } from '../lib/labels';
 
@@ -12,32 +12,40 @@ function MiniTimetable({ schedule, result }: { schedule: Schedule; result: Sched
   const nodes = Array.from({ length: nodesPerDay }, (_, i) => i + 1);
   const courseColors = useMemo(() => resolveCourseColors(schedule.courses.filter((c) => c.participating !== false)), [schedule.courses]);
 
+  // 每个 (day) 的合并块：连续节次的同一课程合并为一个跨行块（与主课表一致）
+  const blocks = days.flatMap((day) => dayBlocks(result.items, day, 'all').map((b) => ({ b, day })));
+
   return (
     <div className="mini-grid" style={{ gridTemplateColumns: `34px repeat(${daysPerWeek}, minmax(52px, 1fr))` }}>
-      <div className="mini-cell mini-head" />
-      {days.map((d) => (
-        <div key={d} className="mini-cell mini-head">
+      <div className="mini-cell mini-head" style={{ gridRow: 1, gridColumn: 1 }} />
+      {days.map((d, di) => (
+        <div key={d} className="mini-cell mini-head" style={{ gridRow: 1, gridColumn: di + 2 }}>
           {DAY_SHORT[d - 1]}
         </div>
       ))}
       {nodes.map((n) => (
         <Fragment key={`r-${n}`}>
-          <div className="mini-cell mini-time">{n}</div>
-          {days.map((d) => (
-            <div key={`${d}-${n}`} className="mini-cell mini-slot">
-              {itemsInCell(result.items, d, n, 'all').map((cc) => (
-                <div
-                  key={`${cc.course.id}-${cc.option.id}`}
-                  className="mini-chip"
-                  style={{ background: courseColors.get(cc.course.id) ?? cc.course.color }}
-                  title={`${cc.course.name} · ${cc.teachers.join('/')} · ${cc.weekLabel}`}
-                >
-                  {cc.course.name}
-                </div>
-              ))}
-            </div>
+          <div className="mini-cell mini-time" style={{ gridRow: n + 1, gridColumn: 1 }}>
+            {n}
+          </div>
+          {days.map((d, di) => (
+            <div key={`${d}-${n}`} className="mini-cell mini-slot" style={{ gridRow: n + 1, gridColumn: di + 2 }} />
           ))}
         </Fragment>
+      ))}
+      {blocks.map(({ b, day }) => (
+        <div
+          key={b.key}
+          className="mini-chip"
+          style={{
+            gridRow: `${b.startNode + 1} / ${b.endNode + 1}`,
+            gridColumn: day + 1,
+            background: courseColors.get(b.course.id) ?? b.course.color,
+          }}
+          title={`${b.course.name} · ${b.teachers.join('/')} · ${b.weekLabel}`}
+        >
+          {b.course.name}
+        </div>
       ))}
     </div>
   );

@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Schedule } from '../../shared/types';
+import { PanelWindow } from './PanelWindow';
 
 interface SaveMeta {
   id: string;
@@ -11,17 +12,17 @@ interface SaveMeta {
 export default function SavePicker({
   currentTerm,
   onSchedule,
+  onClose,
 }: {
   currentTerm: string;
   onSchedule: (s: Schedule) => void;
+  onClose: () => void;
 }) {
   const [saves, setSaves] = useState<SaveMeta[]>([]);
   const [currentId, setCurrentId] = useState('');
-  const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
   const [busy, setBusy] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
 
   const loadSaves = async () => {
     try {
@@ -38,14 +39,6 @@ export default function SavePicker({
     loadSaves();
   }, []);
 
-  useEffect(() => {
-    const onDoc = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
-  }, []);
-
   const switchSave = async (id: string) => {
     if (busy) return;
     setBusy(true);
@@ -53,10 +46,8 @@ export default function SavePicker({
       const r = await fetch(`/api/saves/${id}/switch`, { method: 'POST' });
       const d = await r.json();
       if (d.ok) {
-        setCurrentId(id);
-        setOpen(false);
         if (d.schedule) onSchedule(d.schedule);
-        await loadSaves();
+        onClose();
       }
     } finally {
       setBusy(false);
@@ -75,12 +66,8 @@ export default function SavePicker({
       });
       const d = await r.json();
       if (d.ok) {
-        setCreating(false);
-        setNewName('');
-        setOpen(false);
-        setCurrentId(d.id);
         if (d.schedule) onSchedule(d.schedule);
-        await loadSaves();
+        onClose();
       }
     } finally {
       setBusy(false);
@@ -105,15 +92,10 @@ export default function SavePicker({
   };
 
   return (
-    <div className="save-picker" ref={rootRef}>
-      <button className="save-picker-btn" onClick={() => setOpen((o) => !o)} title="切换/创建存档">
-        <span className="save-picker-term">{currentTerm || '未命名存档'}</span>
-        <span className="caret">{open ? '▴' : '▾'}</span>
-      </button>
-
-      {open && (
-        <div className="save-menu">
-          <div className="save-menu-head">存档</div>
+    <PanelWindow title="存档" onClose={onClose} className="save-panel">
+      <div className="save-body">
+        <div className="muted save-current">当前：{currentTerm || '未命名存档'}</div>
+        <div className="save-list">
           {saves.map((s) => (
             <div
               key={s.id}
@@ -137,28 +119,28 @@ export default function SavePicker({
               )}
             </div>
           ))}
-
-          {creating ? (
-            <div className="save-create">
-              <input
-                autoFocus
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') createSave();
-                  if (e.key === 'Escape') setCreating(false);
-                }}
-                placeholder="存档名"
-              />
-              <button onClick={createSave}>确定</button>
-            </div>
-          ) : (
-            <button className="save-create-btn" onClick={() => setCreating(true)}>
-              ＋ 新建存档
-            </button>
-          )}
         </div>
-      )}
-    </div>
+
+        {creating ? (
+          <div className="save-create">
+            <input
+              autoFocus
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') createSave();
+                if (e.key === 'Escape') setCreating(false);
+              }}
+              placeholder="存档名"
+            />
+            <button onClick={createSave}>确定</button>
+          </div>
+        ) : (
+          <button className="save-create-btn" onClick={() => setCreating(true)}>
+            ＋ 新建存档
+          </button>
+        )}
+      </div>
+    </PanelWindow>
   );
 }

@@ -14,20 +14,45 @@ export function segmentInWeek(s: Segment, week: number): boolean {
   return week >= s.startWeek && week <= s.endWeek;
 }
 
-// 合并周区间为紧凑标签，如 "1-2,5-8周"
+// 合并周区间为紧凑标签。
+// - 周次连续 → "1-2,5-8周"
+// - 周次断续且成奇偶模式 → 压缩为 "3,6-10(双)周"（单=奇数周，双=偶数周）
 export function mergeWeekRanges(ranges: Array<[number, number]>): string {
-  if (ranges.length === 0) return '';
-  const sorted = [...ranges].sort((a, b) => a[0] - b[0]);
-  const merged: Array<[number, number]> = [];
-  for (const [s, e] of sorted) {
-    const last = merged[merged.length - 1];
-    if (last && s <= last[1] + 1) {
-      last[1] = Math.max(last[1], e);
-    } else {
-      merged.push([s, e]);
+  const weekSet = new Set<number>();
+  for (const [s, e] of ranges) for (let w = s; w <= e; w++) weekSet.add(w);
+  const weeks = [...weekSet].sort((a, b) => a - b);
+  if (weeks.length === 0) return '';
+
+  // 存在相邻周 → 连续模式，走原有的连续合并
+  const hasConsecutive = weeks.some((w, i) => i > 0 && w === weeks[i - 1] + 1);
+  if (hasConsecutive) {
+    const merged: Array<[number, number]> = [];
+    for (const w of weeks) {
+      const last = merged[merged.length - 1];
+      if (last && w <= last[1] + 1) last[1] = w;
+      else merged.push([w, w]);
     }
+    return merged.map(([s, e]) => (s === e ? `${s}` : `${s}-${e}`)).join(',') + '周';
   }
-  return merged.map(([s, e]) => (s === e ? `${s}` : `${s}-${e}`)).join(',') + '周';
+
+  // 无相邻周 → 按奇偶（步长 2）压缩为「单/双周」
+  const parts: string[] = [];
+  let i = 0;
+  while (i < weeks.length) {
+    let j = i;
+    while (j + 1 < weeks.length && weeks[j + 1] === weeks[j] + 2) j++;
+    const s = weeks[i];
+    const e = weeks[j];
+    const range = s === e ? `${s}` : `${s}-${e}`;
+    if (j > i) {
+      const parity = s % 2 === 1 ? '单' : '双';
+      parts.push(`${range}(${parity})`);
+    } else {
+      parts.push(range);
+    }
+    i = j + 1;
+  }
+  return parts.join(',') + '周';
 }
 
 export interface CellCourse {
@@ -66,13 +91,15 @@ export function coursesInCell(schedule: Schedule, day: number, node: number, wee
   return itemsInCell(items, day, node, weekFilter);
 }
 
-// 固定课程：内置 + 任何「确认选」的候选
+// 固定课程：内置 + 任何「确认选」的候选。
+// 注意：「不参与排课」（participating === false）的课程即使有确认选候选，也不计入固定课。
 export function fixedItems(schedule: Schedule): Item[] {
   const items: Item[] = [];
   for (const c of schedule.courses) {
     if (c.category === 'builtin') {
       if (c.options[0]) items.push({ course: c, option: c.options[0] });
     } else {
+      if (c.participating === false) continue;
       const sel = c.options.find((o) => o.selected);
       if (sel) items.push({ course: c, option: sel });
     }
@@ -80,11 +107,13 @@ export function fixedItems(schedule: Schedule): Item[] {
   return items;
 }
 
-// 待选课程：所有未确认选、非内置的候选（双课表右侧展示用）
-export function candidateItems(schedule: Schedule): Item[] {
+// 待选课程：所有未确认选、非内置的候选（双课表右侧 / 预览展示用）。
+// hideSelectedCandidates 为真时，课程已有「确认选」候选则不再展示该课程的其它候选。
+export function candidateItems(schedule: Schedule, hideSelectedCandidates = true): Item[] {
   const items: Item[] = [];
   for (const c of schedule.courses) {
     if (c.category === 'builtin') continue;
+    if (hideSelectedCandidates && c.options.some((o) => o.selected)) continue;
     for (const o of c.options) {
       if (!o.selected) items.push({ course: c, option: o });
     }
@@ -104,6 +133,9 @@ export interface DayBlock {
   weekLabel: string;
   room: string;
   fixed: boolean;
+  // 同一格子（星期+节次区间）里同一课程的其它候选（不同教学班、不同老师）。
+  // 用于展示「多候选同时间」的所有老师/地点，以及悬停时注释其它候选信息。
+  coOptions?: Array<{ option: Option; teachers: string[]; room: string }>;
 }
 
 function sameRanges(a: Array<[number, number]>, b: Array<[number, number]>): boolean {
@@ -210,7 +242,11 @@ export function dayBlocks(items: Item[], day: number, weekFilter: 'all' | number
   }
   const out: DayBlock[] = [];
   for (const blocks of cells.values()) {
-    out.push(blocks.find((b) => b.fixed) ?? blocks[0]);
+    const primary = blocks.find((b) => b.fixed) ?? blocks[0];
+    const coOptions = blocks
+      .filter((b) => b !== primary)
+      .map((b) => ({ option: b.option, teachers: b.teachers, room: b.room }));
+    out.push(coOptions.length ? { ...primary, coOptions } : primary);
   }
   return out;
 }

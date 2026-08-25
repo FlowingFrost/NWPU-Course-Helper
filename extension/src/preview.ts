@@ -1,7 +1,9 @@
-import type { Schedule, Course } from '../../shared/types';
+import type { Schedule, Course, Option } from '../../shared/types';
 import { fixedItems, candidateItems, dayBlocks, layoutBlocks, type Item, type LaidBlock } from '../../src/lib/schedule';
+import { optionsConflict } from '../../src/lib/algo';
 import { resolveCourseColors, tintColor } from '../../src/lib/colors';
 import { DAY_FULL } from '../../src/lib/labels';
+import { infoOf, coInfoOf, classBadge } from '../../src/lib/display';
 import { parseScheduleText } from './scheduleText';
 import type { RawLesson } from './model';
 
@@ -24,32 +26,77 @@ export function buildPreviewElement(schedule: Schedule, lesson: RawLesson): HTML
 
   const segments = parseScheduleText(lesson.scheduleText);
 
-  const previewCourse: Course = {
-    id: PREVIEW_ID,
-    code: lesson.courseCode,
-    name: lesson.courseName,
-    category: 'elective',
-    credit: lesson.credit,
-    willingOverride: null,
-    color: PREVIEW_COLOR,
-    options: [
-      {
-        id: '__ch_preview_opt__',
-        label: lesson.lessonCode,
-        rating: 0,
-        selected: false,
-        enrolled: lesson.enrolled ?? 0,
-        capacity: lesson.capacity ?? 0,
-        segments,
-      },
-    ],
-  };
-  const previewItem: Item = { course: previewCourse, option: previewCourse.options[0] };
+  // 教学班匹配：按 courseCode + lessonCode 命中已有候选（内置/确认选/待选），
+  // 命中时高亮该已有课程，而不是在旁边新建一个临时课程、再与它自身判冲突。
+  let matchedItem: Item | null = null;
+  outer: for (const c of schedule.courses) {
+    if (lesson.courseCode && c.code !== lesson.courseCode) continue;
+    for (const o of c.options) {
+      if (lesson.lessonCode && o.label && o.label === lesson.lessonCode) {
+        matchedItem = { course: c, option: o };
+        break outer;
+      }
+    }
+  }
 
-  const fixed = fixedItems(schedule);
-  const others = candidateItems(schedule).filter((it) => it.course.code !== lesson.courseCode);
+  const isMatched = (it: Item) =>
+    matchedItem != null && it.course.id === matchedItem.course.id && it.option.id === matchedItem.option.id;
+
+  // 固定课（内置 + 确认选）：命中项移出，避免与预览自身重叠/自冲突
+  const fixed = fixedItems(schedule).filter((it) => !isMatched(it));
+  // 其它候选：排除命中课程本身 + 同课程编号的其它教学班
+  let others = candidateItems(schedule, schedule.meta.hideSelectedCandidates !== false)
+    .filter((it) => !isMatched(it))
+    .filter((it) => it.course.code !== lesson.courseCode);
+
+  // 复用网页显示规则（读存档 meta）：
+  // - 显示非必修：关闭时过滤非必修候选
+  // - 过滤冲突课程：过滤与固定课冲突的候选
+  // - 单/双课表：双课表仅展示左表（固定课 + 当前课程），不展示待选候选
+  const view = schedule.meta;
+  const info = infoOf(schedule.meta, 'plugin');
+  const coInfo = coInfoOf(schedule.meta);
+  if (view.showElectives === false) {
+    others = others.filter((it) => it.course.category !== 'elective');
+  }
+  if (view.filterConflicts === true) {
+    const fixedOpts = fixed.map((it) => it.option);
+    others = others.filter((it) => !fixedOpts.some((fo) => optionsConflict(it.option, fo)));
+  }
+  if (view.viewMode === 'double') {
+    others = [];
+  }
+
+  let previewItem: Item;
+  if (matchedItem) {
+    previewItem = matchedItem;
+  } else {
+    const previewCourse: Course = {
+      id: PREVIEW_ID,
+      code: lesson.courseCode,
+      name: lesson.courseName,
+      category: 'elective',
+      credit: lesson.credit,
+      willingOverride: null,
+      color: PREVIEW_COLOR,
+      options: [
+        {
+          id: '__ch_preview_opt__',
+          label: lesson.lessonCode,
+          rating: 0,
+          selected: false,
+          enrolled: lesson.enrolled ?? 0,
+          capacity: lesson.capacity ?? 0,
+          segments,
+        },
+      ],
+    };
+    previewItem = { course: previewCourse, option: previewCourse.options[0] };
+  }
+
   const allItems: Item[] = [...fixed, ...others, previewItem];
   const colors = resolveCourseColors(schedule.courses);
+  const previewKey = `${previewItem.course.id}:${previewItem.option.id}`;
 
   // 固定课占用的 (day:node) 集合，用于冲突检测
   const fixedCells = new Set<string>();
@@ -58,7 +105,7 @@ export function buildPreviewElement(schedule: Schedule, lesson: RawLesson): HTML
   for (const d of days) {
     const dayArr: Array<{ block: LaidBlock; isFixed: boolean; isPreview: boolean }> = [];
     for (const b of layoutBlocks(dayBlocks(allItems, d, 'all'))) {
-      const isPreview = b.course.id === PREVIEW_ID;
+      const isPreview = `${b.course.id}:${b.option.id}` === previewKey;
       const isFixed = !isPreview && b.fixed;
       dayArr.push({ block: b, isFixed, isPreview });
       if (isFixed) for (let n = b.startNode; n < b.endNode; n++) fixedCells.add(`${d}:${n}`);
@@ -118,6 +165,11 @@ export function buildPreviewElement(schedule: Schedule, lesson: RawLesson): HTML
         for (let n = block.startNode; n < block.endNode; n++) if (fixedCells.has(`${d}:${n}`)) conflict = true;
       }
 
+      const teacherText = [block.teachers, ...(block.coOptions ?? []).map((co) => co.teachers)]
+        .map((ts) => ts.join(' '))
+        .filter((s) => s !== '')
+        .join(' / ');
+
       const el = document.createElement('div');
       el.style.cssText =
         `position:absolute;box-sizing:border-box;left:${dayLeft[di] + block.lane * laneW + 1}px;` +
@@ -129,20 +181,57 @@ export function buildPreviewElement(schedule: Schedule, lesson: RawLesson): HTML
           : isFixed
             ? 'opacity:1;'
             : 'opacity:0.4;');
-      el.title = `${block.course.name} · ${block.teachers.join('/')} · ${block.weekLabel} · ${block.room}${conflict ? '（与内置课冲突）' : ''}`;
+      el.title = `${block.course.name} · ${teacherText} · ${block.weekLabel} · ${block.room}${conflict ? '（与内置课冲突）' : ''}`;
 
       const nameEl = document.createElement('div');
       nameEl.textContent = block.course.name + (conflict ? ' ⚠' : '');
       nameEl.style.cssText = 'font-weight:600;line-height:1.15;word-break:break-all;';
       el.appendChild(nameEl);
 
-      const teachers = block.teachers.join('/');
-      if (teachers) {
-        const metaEl = document.createElement('div');
-        metaEl.textContent = teachers;
-        metaEl.style.cssText = 'font-size:10px;opacity:0.85;line-height:1.1;word-break:break-all;';
-        el.appendChild(metaEl);
+      if (view.showEnrollment === true) {
+        const en = document.createElement('div');
+        en.textContent = `已选 ${block.option.enrolled}/${block.option.capacity}`;
+        en.style.cssText = 'font-size:10px;font-weight:600;color:#475569;text-align:right;';
+        el.appendChild(en);
       }
+
+      const meta = (text: string, extra = '') => {
+        const d = document.createElement('div');
+        d.textContent = text;
+        d.style.cssText = 'font-size:10px;opacity:0.85;line-height:1.15;word-break:break-all;' + extra;
+        el.appendChild(d);
+      };
+
+      // 不同候选信息叠加：每个候选一行「N班徽标 + 教师（空格）+ 地点」
+      const coList = block.coOptions ?? [];
+      if (coInfo.enabled && coList.length > 0) {
+        const line = (option: Option, teachers: string[], room: string) => {
+          const d = document.createElement('div');
+          d.style.cssText = 'font-size:10px;line-height:1.15;word-break:break-all;';
+          const badge = document.createElement('span');
+          badge.textContent = classBadge(option.label);
+          badge.style.cssText = 'display:inline-block;margin-right:3px;padding:0 3px;border-radius:3px;background:rgba(29,78,216,0.12);color:#1d4ed8;font-weight:700;';
+          d.appendChild(badge);
+          if (coInfo.showTeacher && teachers.length) {
+            const t = document.createElement('span');
+            t.textContent = teachers.join(' ');
+            d.appendChild(t);
+          }
+          if (coInfo.showRoom && room) {
+            const r = document.createElement('span');
+            r.textContent = ' · ' + room;
+            r.style.cssText = 'opacity:0.75;';
+            d.appendChild(r);
+          }
+          el.appendChild(d);
+        };
+        line(block.option, block.teachers, block.room);
+        for (const co of coList) line(co.option, co.teachers, co.room);
+      } else {
+        if (info.teacher && block.teachers.length) meta(block.teachers.join(' '));
+        if (info.room && block.room) meta(block.room, 'opacity:0.7;');
+      }
+      if (info.week && block.weekLabel) meta(block.weekLabel);
 
       grid.appendChild(el);
     }

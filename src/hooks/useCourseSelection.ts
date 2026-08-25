@@ -3,7 +3,8 @@ import type { DayBlock } from '../lib/schedule';
 
 export interface CourseSelection {
   courseId: string;
-  optionId: string | null;
+  optionId: string | null; // 主候选（点击的那个块），用于「淡化其它课程」
+  optionIds: string[]; // 该时间（星期+节次）开课的所有候选，用于详情里一起描边
 }
 
 // 点击选中的课程/候选：同时驱动「课表淡化」与「课程面板打开」。
@@ -14,9 +15,10 @@ export function useCourseSelection() {
   const selectedCourseId = selection && selection.optionId ? selection.courseId : null;
 
   const handleBlockClick = (b: DayBlock) => {
-    setSelection({ courseId: b.course.id, optionId: b.option.id });
+    const optionIds = [b.option.id, ...(b.coOptions ?? []).map((co) => co.option.id)];
+    setSelection({ courseId: b.course.id, optionId: b.option.id, optionIds });
   };
-  const openCourse = (courseId: string) => setSelection({ courseId, optionId: null });
+  const openCourse = (courseId: string) => setSelection({ courseId, optionId: null, optionIds: [] });
   const closeCourse = () => setSelection(null);
 
   return { selection, selectedCourseId, handleBlockClick, openCourse, closeCourse };
