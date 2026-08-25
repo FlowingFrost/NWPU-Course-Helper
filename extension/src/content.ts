@@ -54,7 +54,8 @@ async function send(msg: ExtMessage): Promise<ExtResponse> {
   }
 }
 
-const CATEGORY_LABEL: Record<Category, string> = { elective: '加入候选', required: '加入必修', builtin: '导入已选课' };
+// 导入动作文案（与 src/lib/labels.ts 的 CATEGORY_LABEL「类别显示名」不同，此处是按钮动作名）
+const IMPORT_ACTION_LABEL: Record<Category, string> = { elective: '加入候选', required: '加入必修', builtin: '导入已选课' };
 
 async function importLessons(lessons: RawLesson[], category: Category) {
   if (!lessons.length) {
@@ -66,7 +67,7 @@ async function importLessons(lessons: RawLesson[], category: Category) {
   const selectable = isCourseSelection();
   const resp = await send({ type: 'IMPORT_LESSONS', lessons, category, selectable });
   if (resp.ok) {
-    toast(`已${CATEGORY_LABEL[category]}：导入后共 ${resp.courseCount} 门课`);
+    toast(`已${IMPORT_ACTION_LABEL[category]}：导入后共 ${resp.courseCount} 门课`);
   } else {
     toast(`导入失败：${resp.error || '未知错误'}（选课助手服务是否已启动？）`, true);
   }

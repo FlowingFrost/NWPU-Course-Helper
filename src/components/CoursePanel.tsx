@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
 import type { Schedule, Course, Option, Segment, Category } from '../../shared/types';
 import {
   addCourse,
@@ -18,31 +17,18 @@ import {
 import { resolveCourseColors } from '../lib/colors';
 import { fixedItems } from '../lib/schedule';
 import { optionsConflict } from '../lib/algo';
-
-const CATEGORY_LABEL: Record<Category, string> = { builtin: '内置', required: '必修', elective: '非必修' };
-const DAY_LABELS = ['一', '二', '三', '四', '五', '六', '日'];
+import { CATEGORY_LABEL, DAY_SHORT } from '../lib/labels';
+import { num } from '../lib/num';
+import { Field } from './Field';
+import { Modal } from './Modal';
 
 interface Props {
   schedule: Schedule;
   update: (fn: (s: Schedule) => Schedule) => void;
-  focusCourseId: string | null;
-  focusOptionId: string | null;
-  onFocusCourse: (courseId: string) => void;
+  openCourseId: string | null;
+  highlightOptionId: string | null;
+  onOpenCourse: (courseId: string) => void;
   onCloseCourse: () => void;
-}
-
-function num(v: string): number {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <label className="field">
-      <span>{label}</span>
-      {children}
-    </label>
-  );
 }
 
 function SegmentRow({
@@ -67,7 +53,7 @@ function SegmentRow({
   return (
     <div className="seg">
       <select value={seg.day} onChange={(e) => onChange({ day: Number(e.target.value) })} title="星期">
-        {DAY_LABELS.map((d, i) => (
+        {DAY_SHORT.map((d, i) => (
           <option key={i + 1} value={i + 1}>
             周{d}
           </option>
@@ -215,17 +201,17 @@ function CourseCard({
   );
 }
 
-// 课程候选详情弹窗：与列表筛选解耦，独立按 focusCourseId 渲染
+// 课程候选详情弹窗：与列表筛选解耦，独立按 openCourseId 渲染
 function CourseDetailModal({
   course,
   update,
-  focusOptionId,
+  highlightOptionId,
   fixedOptions,
   onClose,
 }: {
   course: Course;
   update: Props['update'];
-  focusOptionId: string | null;
+  highlightOptionId: string | null;
   fixedOptions: Option[];
   onClose: () => void;
 }) {
@@ -246,21 +232,14 @@ function CourseDetailModal({
 
   // 从课表点击进入时，滚动到高亮的候选
   useEffect(() => {
-    if (!focusOptionId) return;
-    const el = detailRef.current?.querySelector(`[data-option-id="${focusOptionId}"]`);
+    if (!highlightOptionId) return;
+    const el = detailRef.current?.querySelector(`[data-option-id="${highlightOptionId}"]`);
     el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  }, [focusOptionId]);
+  }, [highlightOptionId]);
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal course-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <h3>{course.name || '(未命名)'}</h3>
-          <button className="modal-close" onClick={onClose} aria-label="关闭">
-            ✕
-          </button>
-        </div>
-        <div className="course-detail" ref={detailRef}>
+    <Modal title={course.name || '(未命名)'} onClose={onClose} className="course-modal">
+      <div className="course-detail" ref={detailRef}>
           <div className="course-fields">
             <Field label="名称">
               <input value={course.name} onChange={(e) => update((s) => updateCourse(s, course.id, { name: e.target.value }))} />
@@ -319,7 +298,7 @@ function CourseDetailModal({
                 course={course}
                 option={o}
                 update={update}
-                highlighted={o.id === focusOptionId}
+                highlighted={o.id === highlightOptionId}
                 conflict={filterConflicts && isConflict(o)}
               />
             ))}
@@ -335,13 +314,12 @@ function CourseDetailModal({
           >
             删除课程
           </button>
-        </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 
-export default function CoursePanel({ schedule, update, focusCourseId, focusOptionId, onFocusCourse, onCloseCourse }: Props) {
+export default function CoursePanel({ schedule, update, openCourseId, highlightOptionId, onOpenCourse, onCloseCourse }: Props) {
   const [activeCategories, setActiveCategories] = useState<Set<Category>>(() => new Set(['builtin', 'required', 'elective']));
   const [newName, setNewName] = useState('');
   const [showNonParticipating, setShowNonParticipating] = useState(true);
@@ -368,8 +346,8 @@ export default function CoursePanel({ schedule, update, focusCourseId, focusOpti
   const courseColors = useMemo(() => resolveCourseColors(schedule.courses.filter((c) => c.participating !== false)), [schedule.courses]);
   const fixedOptions = useMemo(() => fixedItems(schedule).map((it) => it.option), [schedule]);
 
-  // 详情弹窗与被筛选的课程列表解耦：直接按 focusCourseId 找课程渲染
-  const focusCourse = focusCourseId ? schedule.courses.find((c) => c.id === focusCourseId) ?? null : null;
+  // 详情弹窗与被筛选的课程列表解耦：直接按 openCourseId 找课程渲染
+  const openCourse = openCourseId ? schedule.courses.find((c) => c.id === openCourseId) ?? null : null;
 
   const handleAdd = () => {
     const name = newName.trim();
@@ -427,16 +405,16 @@ export default function CoursePanel({ schedule, update, focusCourseId, focusOpti
             key={c.id}
             course={c}
             dotColor={courseColors.get(c.id) ?? c.color}
-            onOpen={() => onFocusCourse(c.id)}
+            onOpen={() => onOpenCourse(c.id)}
           />
         ))}
         {courses.length === 0 && <div className="muted empty">暂无课程</div>}
       </div>
-      {focusCourse && (
+      {openCourse && (
         <CourseDetailModal
-          course={focusCourse}
+          course={openCourse}
           update={update}
-          focusOptionId={focusOptionId}
+          highlightOptionId={highlightOptionId}
           fixedOptions={fixedOptions}
           onClose={onCloseCourse}
         />

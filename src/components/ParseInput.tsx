@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { createPortal } from 'react-dom';
 import type { Schedule } from '../../shared/types';
+import { Modal } from './Modal';
 
 // 顶栏右对齐的「粘贴文本 → 解析」输入框：点击自动放大，解析失败弹窗提示（挂到 body，全屏）
 export default function ParseInput({ onSchedule }: { onSchedule: (s: Schedule) => void }) {
@@ -65,21 +65,11 @@ export default function ParseInput({ onSchedule }: { onSchedule: (s: Schedule) =
         {busy ? '…' : '解析'}
       </button>
 
-      {errorMsg &&
-        createPortal(
-          <div className="modal-backdrop" onClick={() => setErrorMsg(null)}>
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
-              <div className="modal-head">
-                <h3>解析失败</h3>
-                <button className="modal-close" onClick={() => setErrorMsg(null)} aria-label="关闭">
-                  ✕
-                </button>
-              </div>
-              <p>{errorMsg}</p>
-            </div>
-          </div>,
-          document.body,
-        )}
+      {errorMsg && (
+        <Modal title="解析失败" onClose={() => setErrorMsg(null)} portal>
+          <p>{errorMsg}</p>
+        </Modal>
+      )}
     </div>
   );
 }

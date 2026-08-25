@@ -1,146 +1,49 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useSchedule } from './hooks/useSchedule';
+import { useViewState } from './hooks/useViewState';
+import { useDualSplit } from './hooks/useDualSplit';
+import { useCourseSelection } from './hooks/useCourseSelection';
+import { useWakeUpImport } from './hooks/useWakeUpImport';
 import Timetable from './components/Timetable';
 import CoursePanel from './components/CoursePanel';
 import SettingsPanel from './components/SettingsPanel';
 import SavePicker from './components/SavePicker';
 import ResultsSection from './components/Results';
 import ParseInput from './components/ParseInput';
-import { applyWakeUpImport, parseWakeUp, importBounds } from './lib/wakeup';
+import { Modal } from './components/Modal';
 import { enumerateSchedules, optionsConflict } from './lib/algo';
 import { resolveCourseColors } from './lib/colors';
 import { fixedItems, candidateItems } from './lib/schedule';
-import type { DayBlock } from './lib/schedule';
 import type { ScheduleResult } from './lib/algo';
 import './App.css';
 
 export default function App() {
   const { schedule, error, saving, update, setAndSave, replace } = useSchedule();
+  const {
+    viewMode,
+    setViewMode,
+    overlayOn,
+    setOverlayOn,
+    showInfo,
+    setShowInfo,
+    showEnrollment,
+    setShowEnrollment,
+    showElectives,
+    setShowElectives,
+    filterConflicts,
+    setFilterConflicts,
+  } = useViewState();
+  const { dualRatio, dragging, dualRef, startDrag, resetDualRatio } = useDualSplit();
+  const { selection, selectedCourseId, handleBlockClick, openCourse, closeCourse } = useCourseSelection();
+  const { importPrompt, onImport, confirmImport, closeImport } = useWakeUpImport(schedule, setAndSave);
+
   const [weekFilter, setWeekFilter] = useState<'all' | number>('all');
   const [electiveTarget, setElectiveTarget] = useState<number | 'max'>('max');
   const [results, setResults] = useState<ScheduleResult[] | null>(null);
-  const [viewMode, setViewMode] = useState<'single' | 'double'>(() => {
-    try {
-      return localStorage.getItem('course-helper:viewMode') === 'double' ? 'double' : 'single';
-    } catch {
-      return 'single';
-    }
-  });
-  const [dualRatio, setDualRatio] = useState<number>(() => {
-    try {
-      const v = Number(localStorage.getItem('course-helper:dualRatio'));
-      return Number.isFinite(v) && v >= 0.1 && v <= 0.9 ? v : 0.5;
-    } catch {
-      return 0.5;
-    }
-  });
-  const [dragging, setDragging] = useState(false);
-  const [overlayOn, setOverlayOn] = useState(false);
-  const [showInfo, setShowInfo] = useState(true);
-  const [showEnrollment, setShowEnrollment] = useState(false);
-  const [showElectives, setShowElectives] = useState(true);
-  const [filterConflicts, setFilterConflicts] = useState(false);
-  const [importPrompt, setImportPrompt] = useState<{
-    text: string;
-    bounds: { maxNode: number; maxWeek: number };
-    nodesPerDay: number;
-    totalWeeks: number;
-  } | null>(null);
   const [activeResult, setActiveResult] = useState<ScheduleResult | null>(null);
-  const [selection, setSelection] = useState<{ courseId: string; optionId: string | null } | null>(null);
-  const dualRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'r' || e.key === 'R') setOverlayOn((o) => !o);
-      if (e.key === 'd' || e.key === 'D') setViewMode((m) => (m === 'single' ? 'double' : 'single'));
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('course-helper:viewMode', viewMode);
-    } catch {
-      /* 忽略 */
-    }
-  }, [viewMode]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('course-helper:dualRatio', String(dualRatio));
-    } catch {
-      /* 忽略 */
-    }
-  }, [dualRatio]);
-
-  useEffect(() => {
-    if (!dragging) return;
-    const apply = (clientX: number) => {
-      const el = dualRef.current;
-      if (!el) return;
-      const rect = el.getBoundingClientRect();
-      const ratio = (clientX - rect.left) / rect.width;
-      setDualRatio(Math.min(0.9, Math.max(0.1, ratio)));
-    };
-    const onMove = (e: PointerEvent) => apply(e.clientX);
-    const onUp = () => setDragging(false);
-    const prevUserSelect = document.body.style.userSelect;
-    document.body.style.userSelect = 'none';
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
-    window.addEventListener('pointercancel', onUp);
-    return () => {
-      document.body.style.userSelect = prevUserSelect;
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
-      window.removeEventListener('pointercancel', onUp);
-    };
-  }, [dragging]);
-
-  useEffect(() => {
-    if (!importPrompt) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setImportPrompt(null);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [importPrompt]);
 
   if (error) return <div className="app-error">加载失败：{error}</div>;
   if (!schedule) return <div className="app-loading">加载中…</div>;
-
-  // 点击课表块 → 双课表右侧淡化其它课程，并在「课程与候选」面板中打开对应课程弹窗、高亮所点候选
-  const focusCourseId = selection && selection.optionId ? selection.courseId : null;
-
-  const handleBlockClick = (b: DayBlock) => {
-    setSelection({ courseId: b.course.id, optionId: b.option.id });
-  };
-
-  const onImport = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const text = String(reader.result ?? '');
-      try {
-        const parsed = parseWakeUp(text);
-        const bounds = importBounds(parsed.courses);
-        if (bounds.maxNode > schedule.meta.nodesPerDay || bounds.maxWeek > schedule.meta.totalWeeks) {
-          setImportPrompt({
-            text,
-            bounds,
-            nodesPerDay: schedule.meta.nodesPerDay,
-            totalWeeks: schedule.meta.totalWeeks,
-          });
-        } else {
-          setAndSave(applyWakeUpImport(schedule, text, 'truncate'));
-        }
-      } catch (e) {
-        alert('导入失败：' + String(e));
-      }
-    };
-    reader.readAsText(file, 'utf-8');
-  };
 
   const selectResult = (r: ScheduleResult) => {
     setActiveResult(r);
@@ -213,7 +116,7 @@ export default function App() {
           />
           结果叠加层 (R)
         </label>
-        <SettingsPanel schedule={schedule} update={update} onResetDualRatio={() => setDualRatio(0.5)} onImportWakeUp={onImport} />
+        <SettingsPanel schedule={schedule} update={update} onResetDualRatio={resetDualRatio} onImportWakeUp={onImport} />
         <span className={`save ${saving ? '' : 'ok'}`}>{saving ? '保存中…' : '已保存'}</span>
         <ParseInput onSchedule={replace} />
       </header>
@@ -241,18 +144,9 @@ export default function App() {
             <div
               className={`dual-divider${dragging ? ' dragging' : ''}`}
               title={`左表 ${Math.round(dualRatio * 100)}% · 拖动调整`}
-              onPointerDown={(e) => {
-                e.preventDefault();
-                setDragging(true);
-                const el = dualRef.current;
-                if (el) {
-                  const rect = el.getBoundingClientRect();
-                  const ratio = (e.clientX - rect.left) / rect.width;
-                  setDualRatio(Math.min(0.9, Math.max(0.1, ratio)));
-                }
-              }}
+              onPointerDown={startDrag}
             />
-            <Timetable schedule={schedule} weekFilter={weekFilter} items={rightItems} colors={rightColors} showInfo={showInfo} showEnrollment={showEnrollment} candidate style={{ flex: `${1 - dualRatio} 1 0%` }} onBlockClick={handleBlockClick} focusCourseId={focusCourseId} />
+            <Timetable schedule={schedule} weekFilter={weekFilter} items={rightItems} colors={rightColors} showInfo={showInfo} showEnrollment={showEnrollment} candidate style={{ flex: `${1 - dualRatio} 1 0%` }} onBlockClick={handleBlockClick} selectedCourseId={selectedCourseId} />
           </div>
         )}
       </div>
@@ -262,10 +156,10 @@ export default function App() {
           <CoursePanel
             schedule={schedule}
             update={update}
-            focusCourseId={selection?.courseId ?? null}
-            focusOptionId={selection?.optionId ?? null}
-            onFocusCourse={(courseId) => setSelection({ courseId, optionId: null })}
-            onCloseCourse={() => setSelection(null)}
+            openCourseId={selection?.courseId ?? null}
+            highlightOptionId={selection?.optionId ?? null}
+            onOpenCourse={openCourse}
+            onCloseCourse={closeCourse}
           />
         </div>
       </div>
@@ -280,36 +174,20 @@ export default function App() {
       />
 
       {importPrompt && (
-        <div className="modal-backdrop" onClick={() => setImportPrompt(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>导入内容超出当前设置</h3>
-            <p>
-              导入的课程包含最多 <b>第 {importPrompt.bounds.maxNode} 节</b>、<b>第 {importPrompt.bounds.maxWeek} 周</b>。
-              <br />
-              当前存档设置为：每天 {importPrompt.nodesPerDay} 节、共 {importPrompt.totalWeeks} 周。
-            </p>
-            <div className="modal-actions">
-              <button
-                onClick={() => {
-                  setAndSave(applyWakeUpImport(schedule, importPrompt.text, 'truncate'));
-                  setImportPrompt(null);
-                }}
-              >
-                截断超出部分
-              </button>
-              <button
-                className="primary"
-                onClick={() => {
-                  setAndSave(applyWakeUpImport(schedule, importPrompt.text, 'widen'));
-                  setImportPrompt(null);
-                }}
-              >
-                拓宽到 {importPrompt.bounds.maxNode} 节 / {importPrompt.bounds.maxWeek} 周
-              </button>
-              <button onClick={() => setImportPrompt(null)}>取消</button>
-            </div>
+        <Modal title="导入内容超出当前设置" onClose={closeImport}>
+          <p>
+            导入的课程包含最多 <b>第 {importPrompt.bounds.maxNode} 节</b>、<b>第 {importPrompt.bounds.maxWeek} 周</b>。
+            <br />
+            当前存档设置为：每天 {importPrompt.nodesPerDay} 节、共 {importPrompt.totalWeeks} 周。
+          </p>
+          <div className="modal-actions">
+            <button onClick={() => confirmImport('truncate')}>截断超出部分</button>
+            <button className="primary" onClick={() => confirmImport('widen')}>
+              拓宽到 {importPrompt.bounds.maxNode} 节 / {importPrompt.bounds.maxWeek} 周
+            </button>
+            <button onClick={closeImport}>取消</button>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

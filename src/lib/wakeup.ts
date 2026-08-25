@@ -1,4 +1,5 @@
 import type { Course, NodeTime, Schedule, Segment } from '../../shared/types';
+import { segmentsEqual } from '../../shared/segment';
 
 interface WakeUpCourseInfo {
   id: number;
@@ -163,15 +164,6 @@ export function applyWakeUpImport(
   }
   next.nodeTimes = nodeTimes;
 
-  const sameSegment = (a: Segment, b: Segment) =>
-    a.day === b.day &&
-    a.startNode === b.startNode &&
-    a.step === b.step &&
-    a.startWeek === b.startWeek &&
-    a.endWeek === b.endWeek &&
-    a.room === b.room &&
-    a.teacher === b.teacher;
-
   // 同名课程：合并新文件里的时段（去重后追加），而不是整门跳过
   for (const imported of parsed.courses) {
     const segs = fitSegments(imported.options[0]?.segments ?? [], nodesPerDay, totalWeeks);
@@ -185,7 +177,7 @@ export function applyWakeUpImport(
     if (segs.length === 0) continue;
     const merged = [...(existing.options[0]?.segments ?? [])];
     for (const seg of segs) {
-      if (!merged.some((s) => sameSegment(s, seg))) merged.push(seg);
+      if (!merged.some((s) => segmentsEqual(s, seg))) merged.push(seg);
     }
     next.courses[idx] = {
       ...existing,

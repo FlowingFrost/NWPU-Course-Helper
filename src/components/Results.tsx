@@ -4,8 +4,7 @@ import type { ScheduleResult } from '../lib/algo';
 import { diagnoseNoSolution } from '../lib/algo';
 import { itemsInCell } from '../lib/schedule';
 import { resolveCourseColors } from '../lib/colors';
-
-const DAY_LABELS = ['一', '二', '三', '四', '五', '六', '日'];
+import { DAY_SHORT } from '../lib/labels';
 
 function MiniTimetable({ schedule, result }: { schedule: Schedule; result: ScheduleResult }) {
   const { nodesPerDay, daysPerWeek } = schedule.meta;
@@ -18,7 +17,7 @@ function MiniTimetable({ schedule, result }: { schedule: Schedule; result: Sched
       <div className="mini-cell mini-head" />
       {days.map((d) => (
         <div key={d} className="mini-cell mini-head">
-          {DAY_LABELS[d - 1]}
+          {DAY_SHORT[d - 1]}
         </div>
       ))}
       {nodes.map((n) => (

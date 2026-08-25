@@ -4,8 +4,8 @@ import type { Schedule } from '../../shared/types';
 import { dayBlocks, layoutBlocks } from '../lib/schedule';
 import type { Item, DayBlock } from '../lib/schedule';
 import { resolveCourseColors, comboColor, minWeekday, tintColor } from '../lib/colors';
+import { DAY_FULL } from '../lib/labels';
 
-const DAY_NAMES = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 const ROW_H = 52;
 const GAP = 2;
 const DIVIDER_H = 2; // 分割线占位高度
@@ -20,7 +20,7 @@ export default function Timetable({
   candidate = false,
   style,
   onBlockClick,
-  focusCourseId = null,
+  selectedCourseId = null,
   colors,
 }: {
   schedule: Schedule;
@@ -32,7 +32,7 @@ export default function Timetable({
   candidate?: boolean;
   style?: CSSProperties;
   onBlockClick?: (b: DayBlock) => void;
-  focusCourseId?: string | null;
+  selectedCourseId?: string | null;
   colors?: Map<string, string>;
 }) {
   const { nodesPerDay, daysPerWeek } = schedule.meta;
@@ -46,7 +46,7 @@ export default function Timetable({
   const totalHeight = nodesPerDay * rowH + dividerNodes.length * DIVIDER_H;
   const srcItems: Item[] = (items ?? schedule.courses.flatMap((c) => c.options.map((o): Item => ({ course: c, option: o }))))
     .filter((it) => it.course.category === 'builtin' || it.course.participating !== false);
-  const [hoverCourseId, setHoverCourseId] = useState<string | null>(null);
+  const [hoveredCourseId, setHoveredCourseId] = useState<string | null>(null);
 
   // 均分卡片宽度：对所有课表模式生效（单课表 / 双课表 / 结果叠加层）。
   // 天列宽按「每天最大重叠课程数」比例分配。
@@ -69,11 +69,11 @@ export default function Timetable({
   const courseColors = useMemo(() => colors ?? resolveCourseColors(schedule.courses.filter((c) => c.participating !== false)), [colors, schedule.courses]);
   // 星期组合区分：仅双课表右侧候选课表启用（开关默认开）
   const comboEnabled = candidate && schedule.meta.weekComboColors !== false;
-  // 聚焦淡化（所有课表模式一致）：悬停优先、其次点击聚焦的课程保持全亮，
-  // 其余课程块按 focusDimOpacity 降透明度。
+  // 聚焦淡化（所有课表模式一致）：聚焦课程保持全亮，其余课程块按 focusDimOpacity 降透明度。
+  // focusedCourseId 为唯一聚焦来源：悬停优先，其次为点击选中的课程。
   const dimOpacity = schedule.meta.focusDimOpacity ?? 0.5;
-  const focusId = hoverCourseId ?? focusCourseId;
-  const dimActive = focusId != null && srcItems.some((it) => it.course.id === focusId);
+  const focusedCourseId = hoveredCourseId ?? selectedCourseId;
+  const dimActive = focusedCourseId != null && srcItems.some((it) => it.course.id === focusedCourseId);
 
   const borderColor = (b: DayBlock): string | undefined => {
     const base = courseColors.get(b.course.id) ?? b.course.color;
@@ -91,7 +91,7 @@ export default function Timetable({
         <div className="tt-time-head">节次</div>
         {dayData.map(({ day, lanes }) => (
           <div key={day} className="tt-day-head" style={evenCardWidth ? { flexGrow: lanes, minWidth: 0 } : undefined}>
-            {DAY_NAMES[day - 1]}
+            {DAY_FULL[day - 1]}
           </div>
         ))}
       </div>
@@ -125,7 +125,7 @@ export default function Timetable({
               {blocks.map((b) => {
                 const color = borderColor(b);
                 const bg = color ? tintColor(color) : undefined;
-                const focused = dimActive && b.course.id === focusId;
+                const focused = dimActive && b.course.id === focusedCourseId;
                 const dimmed = dimActive && !focused;
                 return (
                 <div
@@ -142,8 +142,8 @@ export default function Timetable({
                   }}
                   title={`${b.course.name} · ${b.teachers.join('/')} · ${b.weekLabel} · ${b.room}`}
                   onClick={onBlockClick ? () => onBlockClick(b) : undefined}
-                  onMouseEnter={() => setHoverCourseId(b.course.id)}
-                  onMouseLeave={() => setHoverCourseId(null)}
+                  onMouseEnter={() => setHoveredCourseId(b.course.id)}
+                  onMouseLeave={() => setHoveredCourseId(null)}
                 >
                   <div className="block-name">{b.course.name}</div>
                   {showEnrollment && <div className="block-enroll">已选 {b.option.enrolled}/{b.option.capacity}</div>}

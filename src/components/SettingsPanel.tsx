@@ -1,20 +1,8 @@
 import { useEffect, useState } from 'react';
-import type { ReactNode } from 'react';
 import type { Schedule, Meta } from '../../shared/types';
-
-function num(v: string): number {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <label className="field">
-      <span>{label}</span>
-      {children}
-    </label>
-  );
-}
+import { num } from '../lib/num';
+import { Field } from './Field';
+import { Modal } from './Modal';
 
 export default function SettingsPanel({
   schedule,
@@ -84,15 +72,8 @@ export default function SettingsPanel({
     <>
       <button onClick={() => setOpen(true)}>设置</button>
       {open && (
-        <div className="modal-backdrop" onClick={() => setOpen(false)}>
-          <div className="modal settings-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-head">
-              <h3>设置</h3>
-              <button className="modal-close" onClick={() => setOpen(false)} aria-label="关闭">
-                ✕
-              </button>
-            </div>
-            <div className="settings-body">
+        <Modal title="设置" onClose={() => setOpen(false)} className="settings-modal">
+          <div className="settings-body">
               <div className="options-head">显示偏好</div>
               <div className="pref-row">
                 <Field label="星期组合区分">
@@ -226,9 +207,8 @@ export default function SettingsPanel({
                   />
                 </label>
               </div>
-            </div>
           </div>
-        </div>
+        </Modal>
       )}
     </>
   );

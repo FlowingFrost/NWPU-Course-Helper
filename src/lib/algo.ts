@@ -1,5 +1,6 @@
 import type { Schedule, Course, Option, Segment } from '../../shared/types';
 import { emptyOption } from './mutations';
+import { fixedItems as collectFixedItems } from './schedule';
 
 export interface ChosenItem {
   course: Course;
@@ -124,24 +125,12 @@ function subsets<T>(arr: T[], maxSize: number | 'max'): T[][] {
 
 // 组合枚举 + 排序：必修各取一候选，非必修取大小≤K 的子集并各取一候选
 export function enumerateSchedules(schedule: Schedule, electiveTarget: number | 'max'): ScheduleResult[] {
-  const builtin = schedule.courses.filter((c) => c.category === 'builtin');
   const required = schedule.courses.filter((c) => c.category === 'required');
   const allElectives = schedule.courses.filter((c) => c.category === 'elective');
 
-  const fixedItems: ChosenItem[] = [];
-  const fixedCourses: Course[] = [];
-  const addFixed = (courses: Course[]) => {
-    for (const c of courses) {
-      const sel = c.options.find((o) => o.selected);
-      if (sel) {
-        fixedItems.push({ course: c, option: sel });
-        fixedCourses.push(c);
-      }
-    }
-  };
-  addFixed(builtin);
-  addFixed(required);
-  addFixed(allElectives);
+  // 固定课程（内置 + 已确认选的必修/非必修）
+  const fixedItems = collectFixedItems(schedule);
+  const fixedCourses = fixedItems.map((f) => f.course);
 
   // 固定课程自身冲突或超学分 → 无解
   if (combinationConflicts(fixedItems.map((f) => f.option))) return [];
@@ -220,21 +209,10 @@ export interface DiagnosisItem {
 // 无可行组合时的诊断：找出具体冲突或学分原因，供用户排查
 export function diagnoseNoSolution(schedule: Schedule): DiagnosisItem[] {
   const items: DiagnosisItem[] = [];
-  const builtin = schedule.courses.filter((c) => c.category === 'builtin');
   const required = schedule.courses.filter((c) => c.category === 'required');
-  const electives = schedule.courses.filter((c) => c.category === 'elective');
 
   // 固定：内置 + 已确认选的候选
-  const fixed: Array<{ course: Course; option: Option }> = [];
-  const addFixed = (courses: Course[]) => {
-    for (const c of courses) {
-      const sel = c.options.find((o) => o.selected);
-      if (sel) fixed.push({ course: c, option: sel });
-    }
-  };
-  addFixed(builtin);
-  addFixed(required);
-  addFixed(electives);
+  const fixed = collectFixedItems(schedule);
 
   const cap = schedule.meta.creditCap;
   const fixedCredit = fixed.reduce((n, f) => n + f.course.credit, 0);

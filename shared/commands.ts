@@ -1,5 +1,6 @@
 import type { Schedule, Course, Option, Segment, Category, Meta } from './types';
 import { uid, updateCourse, deleteCourse, addOption, updateOption, setSelected } from './mutations';
+import { segmentsEqual } from './segment';
 
 // 结构化命令集合 —— AI 与外部工具都通过它修改课程表（DESIGN.md §9.2）
 export type Command =
@@ -18,23 +19,11 @@ export function findCourseByOptionId(schedule: Schedule, optionId: string): Cour
   return schedule.courses.find((c) => c.options.some((o) => o.id === optionId));
 }
 
-function sameSegment(a: Segment, b: Segment): boolean {
-  return (
-    a.day === b.day &&
-    a.startNode === b.startNode &&
-    a.step === b.step &&
-    a.startWeek === b.startWeek &&
-    a.endWeek === b.endWeek &&
-    a.room === b.room &&
-    a.teacher === b.teacher
-  );
-}
-
 function sameOptionContent(a: { label: string; segments: Segment[] }, b: { label: string; segments: Segment[] }): boolean {
   if (a.label !== b.label) return false;
   if (a.segments.length !== b.segments.length) return false;
   for (let i = 0; i < a.segments.length; i++) {
-    if (!sameSegment(a.segments[i], b.segments[i])) return false;
+    if (!segmentsEqual(a.segments[i], b.segments[i])) return false;
   }
   return true;
 }

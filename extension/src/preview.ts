@@ -1,13 +1,13 @@
 import type { Schedule, Course } from '../../shared/types';
 import { fixedItems, candidateItems, dayBlocks, layoutBlocks, type Item, type LaidBlock } from '../../src/lib/schedule';
 import { resolveCourseColors, tintColor } from '../../src/lib/colors';
+import { DAY_FULL } from '../../src/lib/labels';
 import { parseScheduleText } from './scheduleText';
 import type { RawLesson } from './model';
 
 // 迷你课表预览渲染器：复用选课助手的 dayBlocks/layoutBlocks 布局与配色，
 // 在教务页面里悬停「预览」按钮时，弹出「内置课 + 当前课程高亮 + 其它候选淡化」的小课表。
 // 尺寸随视口相对缩放；「均分列宽」跟随设置（meta.evenCardWidth）。
-const DAY_NAMES = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 const HEAD_H = 22;
 const PREVIEW_COLOR = '#f59e0b';
 const PREVIEW_ID = '__ch_preview__';
@@ -93,7 +93,7 @@ export function buildPreviewElement(schedule: Schedule, lesson: RawLesson): HTML
   head.style.cssText = 'display:flex;';
   for (let i = 0; i < daysPerWeek; i++) {
     const h = document.createElement('div');
-    h.textContent = DAY_NAMES[i];
+    h.textContent = DAY_FULL[i];
     h.style.cssText = `flex:0 0 ${dayW[i]}px;text-align:center;font-weight:600;line-height:${HEAD_H}px;`;
     head.appendChild(h);
   }
