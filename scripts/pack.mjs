@@ -13,6 +13,7 @@ import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { embedWinResources } from './winres.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 process.chdir(ROOT);
@@ -92,7 +93,16 @@ console.log(`\n$ pkg .pack/server.cjs --targets ${target} --output ${exeRel}`);
 await pkgExec(['.pack/server.cjs', '--targets', target, '--output', exeRel, '--public', '--public-packages', '*']);
 
 // 4.5) Windows：隐藏后端控制台（子系统 console → GUI）
-if (plat === 'win') patchGuiSubsystem(exeRel);
+if (plat === 'win') {
+  patchGuiSubsystem(exeRel);
+  // 4.6) 写入 exe 图标（CourseHelper.png）与版本信息（resedit，保留 pkg 的 overlay）
+  try {
+    const r = embedWinResources(exeRel, { version, iconPngPath: 'CourseHelper.png' });
+    console.log(`已写入 exe 图标(${r.iconSizes.join('/')}px)与版本 ${r.version}`);
+  } catch (e) {
+    console.warn('写入 exe 图标/版本信息失败（不影响运行，但 exe 将使用默认图标）:', e?.message || e);
+  }
+}
 
 // 5) 组装发布目录：可执行文件 + 网页 dist/ + 浏览器插件 extension/（+ 托盘壳，若已构建）
 cp('dist', path.join(releaseDir, 'dist'));
@@ -100,9 +110,19 @@ cp('extension/dist', path.join(releaseDir, 'extension'));
 
 const trayExe = path.join('tray', 'course-helper-tray.exe');
 const hasTray = process.platform === 'win32' && fs.existsSync(trayExe);
+if (!hasTray && plat === 'win') {
+  console.warn('提示：未找到 tray/course-helper-tray.exe，发布包将不含托盘壳。');
+  console.warn('      在 Windows 上先执行 `npm run build:tray` 再打包即可包含。');
+}
 if (hasTray) {
   cp(trayExe, path.join(releaseDir, 'CourseHelperTray.exe'));
 }
+
+// 数据目录：Windows 用 %APPDATA%\CourseHelper，Linux 用 exe 同目录 data/
+const dataDirNote =
+  plat === 'win'
+    ? '   （数据保存在 %APPDATA%\\CourseHelper，卸载/删除程序不影响存档）'
+    : '   （数据保存在本文件夹的 data/ 目录）';
 
 fs.writeFileSync(
   path.join(releaseDir, 'README.txt'),
@@ -114,7 +134,7 @@ fs.writeFileSync(
       ? ['1. 双击 CourseHelperTray.exe（常驻托盘，自动打开网页）', '   · 右键托盘图标可「打开网站 / 退出」']
       : [`1. 双击 CourseHelper${exeExt}`]),
     '2. 浏览器打开 http://localhost:3001',
-    '   （首次运行会在本文件夹生成 data/ 保存数据）',
+    dataDirNote,
     '',
     '【浏览器插件】',
     '1. Chrome 打开 chrome://extensions',

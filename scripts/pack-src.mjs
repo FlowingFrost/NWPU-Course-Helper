@@ -26,6 +26,19 @@ function opt(name, def) {
 }
 const version = opt('--version', 'v' + pkgJson.version);
 
+// 若显式指定了 --version，同步更新本地 package.json 的 version，
+// 使本地工程与源码包版本一致（否则之后跑 pack:win 等读 package.json 版本的操作仍回退旧版本）。
+const versionIdx = args.indexOf('--version');
+const explicitVersion = versionIdx >= 0 && !!args[versionIdx + 1];
+if (explicitVersion) {
+  const localVer = version.replace(/^v/i, '');
+  if (pkgJson.version !== localVer) {
+    pkgJson.version = localVer;
+    fs.writeFileSync('package.json', JSON.stringify(pkgJson, null, 2) + '\n');
+    console.log(`已同步本地 package.json 版本 → ${localVer}`);
+  }
+}
+
 const name = `src-${version}`;
 const stageDir = path.join('releases', name);
 const zipPath = path.join('releases', `${name}.zip`);

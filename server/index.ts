@@ -9,8 +9,22 @@ import { parseCommands } from '../shared/parser';
 
 // 基础目录：pkg 打包成 exe 时用 exe 所在目录（可写、可放 dist）；开发时用当前工作目录（项目根）
 const IS_PKG = typeof (process as any).pkg !== 'undefined';
-const BASE = IS_PKG ? path.dirname(process.execPath) : process.cwd();
-const DATA_DIR = path.join(BASE, 'data');
+const EXE_DIR = IS_PKG ? path.dirname(process.execPath) : process.cwd();
+
+// 数据目录与网页目录分开：
+// - dist/（网页）始终跟着 exe，发布时与 exe 放一起；
+// - data/（存档）：Windows 放在 %APPDATA%\CourseHelper（Program Files 不可写、卸载不丢数据），
+//   Linux / 开发环境仍放在 exe 目录（或项目根）下的 data/。
+function resolveDataDir(): string {
+  if (IS_PKG && process.platform === 'win32') {
+    const appData =
+      process.env.APPDATA ||
+      path.join(process.env.USERPROFILE || process.env.HOME || '', 'AppData', 'Roaming');
+    return path.join(appData, 'CourseHelper');
+  }
+  return path.join(EXE_DIR, 'data');
+}
+const DATA_DIR = resolveDataDir();
 const BACKUP_DIR = path.join(DATA_DIR, 'backup');
 const SAVES_DIR = path.join(DATA_DIR, 'saves');
 const SETTINGS_PATH = path.join(DATA_DIR, 'settings.json');
@@ -41,7 +55,7 @@ function defaultSchedule(): Schedule {
       startDate: '2026-03-02',
       daysPerWeek: 7,
       nodesPerDay: 13,
-      totalWeeks: 16,
+      totalWeeks: 17,
       creditCap: 30,
       willingBudget: 150,
     },
@@ -65,11 +79,7 @@ function readJson<T>(p: string, fallback: T): T {
   }
 }
 
-function atomicWrite(p: string, data: unknown, backup: boolean) {
-  if (backup && fs.existsSync(p)) {
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    fs.copyFileSync(p, path.join(BACKUP_DIR, `${path.basename(p)}.${stamp}`));
-  }
+function atomicWrite(p: string, data: unknown) {
   const tmp = `${p}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf-8');
   fs.renameSync(tmp, p);
@@ -94,7 +104,7 @@ function readSchedule(): Schedule {
 }
 
 function writeSchedule(s: Schedule) {
-  atomicWrite(savePath(currentSaveId(readSettings())), s, true);
+  atomicWrite(savePath(currentSaveId(readSettings())), s);
 }
 
 function listSaves(): Array<{ id: string; term: string; school: string; courseCount: number; updatedAt: number }> {
@@ -115,6 +125,65 @@ function listSaves(): Array<{ id: string; term: string; school: string; courseCo
       return { id, term: s.meta?.term || id, school: s.meta?.school || '', courseCount: s.courses?.length ?? 0, updatedAt };
     })
     .sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+// —— 手动备份 ——
+// 结构：data/backup/<saveId>/<backupId>.json，文件内容为 { id, name, createdAt, schedule }。
+// 仅手动创建（不再在每次写存档时自动备份）。
+interface BackupFile {
+  id: string;
+  name: string;
+  createdAt: number;
+  schedule: Schedule;
+}
+
+function backupDirFor(saveId: string): string {
+  return path.join(BACKUP_DIR, saveId);
+}
+
+function backupPath(saveId: string, backupId: string): string {
+  return path.join(backupDirFor(saveId), `${backupId}.json`);
+}
+
+// 防止路径穿越：存档 id / 备份 id 只允许字母数字与 - _ 。
+function sanitizeId(raw: string): string {
+  return raw.replace(/[^a-zA-Z0-9_-]/g, '');
+}
+
+function readBackup(saveId: string, backupId: string): BackupFile | null {
+  try {
+    const bf = JSON.parse(fs.readFileSync(backupPath(saveId, backupId), 'utf-8')) as BackupFile;
+    return bf && bf.schedule ? bf : null;
+  } catch {
+    return null;
+  }
+}
+
+function listBackups(saveId: string): Array<{ id: string; name: string; createdAt: number; courseCount: number }> {
+  const dir = backupDirFor(saveId);
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith('.json'))
+    .map((f) => {
+      const id = f.slice(0, -'.json'.length);
+      const bf = readBackup(saveId, id);
+      if (!bf) return null;
+      return {
+        id,
+        name: bf.name || id,
+        createdAt: bf.createdAt ?? 0,
+        courseCount: bf.schedule?.courses?.length ?? 0,
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null)
+    .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+function defaultBackupName(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `备份 ${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
 function ensureDataDir() {
@@ -169,7 +238,7 @@ app.get('/api/settings', (_req, res) => {
 
 app.put('/api/settings', (req, res) => {
   try {
-    atomicWrite(SETTINGS_PATH, req.body, false);
+    atomicWrite(SETTINGS_PATH, req.body);
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ ok: false, error: String(e) });
@@ -187,10 +256,10 @@ app.post('/api/saves', (req, res) => {
     const id = `save-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
     const sched = defaultSchedule();
     sched.meta.term = name;
-    atomicWrite(savePath(id), sched, false);
+    atomicWrite(savePath(id), sched);
     const settings = readSettings();
     settings.currentSaveId = id;
-    atomicWrite(SETTINGS_PATH, settings, false);
+    atomicWrite(SETTINGS_PATH, settings);
     res.json({ ok: true, id, schedule: sched, saves: listSaves(), currentId: id });
   } catch (e) {
     res.status(500).json({ ok: false, error: String(e) });
@@ -203,7 +272,7 @@ app.post('/api/saves/:id/switch', (req, res) => {
     if (!fs.existsSync(savePath(id))) return res.status(404).json({ ok: false, error: '存档不存在' });
     const settings = readSettings();
     settings.currentSaveId = id;
-    atomicWrite(SETTINGS_PATH, settings, false);
+    atomicWrite(SETTINGS_PATH, settings);
     res.json({ ok: true, schedule: readSchedule(), currentId: id });
   } catch (e) {
     res.status(500).json({ ok: false, error: String(e) });
@@ -212,16 +281,73 @@ app.post('/api/saves/:id/switch', (req, res) => {
 
 app.delete('/api/saves/:id', (req, res) => {
   try {
-    const id = req.params.id;
+    const id = sanitizeId(req.params.id);
     if (listSaves().length <= 1) return res.status(400).json({ ok: false, error: '至少保留一个存档' });
     if (!fs.existsSync(savePath(id))) return res.status(404).json({ ok: false, error: '存档不存在' });
     fs.unlinkSync(savePath(id));
+    // 该存档的手动备份一并删除（备份依附于存档，单独保留无意义）
+    fs.rmSync(backupDirFor(id), { recursive: true, force: true });
     const settings = readSettings();
     if (settings.currentSaveId === id) {
       settings.currentSaveId = listSaves()[0]?.id ?? 'default';
-      atomicWrite(SETTINGS_PATH, settings, false);
+      atomicWrite(SETTINGS_PATH, settings);
     }
     res.json({ ok: true, schedule: readSchedule(), saves: listSaves(), currentId: currentSaveId(readSettings()) });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e) });
+  }
+});
+
+// —— 手动备份（每存档一组，仅手动创建，支持更名/删除）——
+app.get('/api/saves/:id/backups', (req, res) => {
+  try {
+    const id = sanitizeId(req.params.id);
+    if (!fs.existsSync(savePath(id))) return res.status(404).json({ ok: false, error: '存档不存在' });
+    res.json({ ok: true, backups: listBackups(id) });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e) });
+  }
+});
+
+app.post('/api/saves/:id/backups', (req, res) => {
+  try {
+    const id = sanitizeId(req.params.id);
+    if (!fs.existsSync(savePath(id))) return res.status(404).json({ ok: false, error: '存档不存在' });
+    const schedule = readJson<Schedule>(savePath(id), defaultSchedule());
+    const backupId = `b-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    const name = String(req.body?.name ?? '').trim() || defaultBackupName();
+    const file: BackupFile = { id: backupId, name, createdAt: Date.now(), schedule };
+    fs.mkdirSync(backupDirFor(id), { recursive: true });
+    atomicWrite(backupPath(id, backupId), file);
+    res.json({ ok: true, backups: listBackups(id) });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e) });
+  }
+});
+
+app.patch('/api/saves/:id/backups/:backupId', (req, res) => {
+  try {
+    const id = sanitizeId(req.params.id);
+    const backupId = sanitizeId(req.params.backupId);
+    const bf = readBackup(id, backupId);
+    if (!bf) return res.status(404).json({ ok: false, error: '备份不存在' });
+    const name = String(req.body?.name ?? '').trim();
+    if (!name) return res.status(400).json({ ok: false, error: '名称不能为空' });
+    bf.name = name;
+    atomicWrite(backupPath(id, backupId), bf);
+    res.json({ ok: true, backups: listBackups(id) });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e) });
+  }
+});
+
+app.delete('/api/saves/:id/backups/:backupId', (req, res) => {
+  try {
+    const id = sanitizeId(req.params.id);
+    const backupId = sanitizeId(req.params.backupId);
+    if (!readBackup(id, backupId)) return res.status(404).json({ ok: false, error: '备份不存在' });
+    fs.unlinkSync(backupPath(id, backupId));
+    res.json({ ok: true, backups: listBackups(id) });
   } catch (e) {
     res.status(500).json({ ok: false, error: String(e) });
   }
@@ -260,7 +386,7 @@ app.post('/api/parse', (req, res) => {
 });
 
 // 生产环境托管 dist（构建后由 npm start 提供）
-const dist = path.join(BASE, 'dist');
+const dist = path.join(EXE_DIR, 'dist');
 if (fs.existsSync(dist)) {
   app.use(express.static(dist));
 }
@@ -281,15 +407,19 @@ function persistPort(port: number) {
     const settings = readSettings();
     if (settings.port !== port) {
       settings.port = port;
-      atomicWrite(SETTINGS_PATH, settings, false);
+      atomicWrite(SETTINGS_PATH, settings);
     }
   } catch {
     /* 忽略：记不住端口不影响本次运行 */
   }
 }
 
+// 仅监听本机回环地址，避免 Windows 防火墙弹窗与局域网暴露；
+// 需要跨机访问（如 WSL 调试）时可设环境变量 HOST=0.0.0.0 覆盖。
+const HOST = process.env.HOST || '127.0.0.1';
+
 function startServer(port: number, attemptsLeft: number) {
-  const server = app.listen(port, () => {
+  const server = app.listen(port, HOST, () => {
     console.log(`[course-helper] API 已启动：http://localhost:${port}`);
     console.log('（保持本窗口开启；关闭窗口即停止服务）');
     persistPort(port);

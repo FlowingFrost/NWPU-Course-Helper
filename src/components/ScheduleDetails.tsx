@@ -147,6 +147,13 @@ export default function ScheduleDetails({ schedule, onClose }: { schedule: Sched
   const bars = useMemo(() => ganttBars(schedule), [schedule]);
   const [partitionMode, setPartitionMode] = useState<'grid' | 'horizontal'>('grid');
 
+  // 详情课表的尺寸：行高可设置；最小宽度按「时间列 52px + 每天 60px + 卡片内边距/边框 18px」计算，
+  // 保证课表不会被压到出现横向滚动条（宁可少放一列，也不坍缩）。
+  const { daysPerWeek } = schedule.meta;
+  const rowH = schedule.meta.detailRowHeight ?? 41;
+  const naturalMinWidth = 52 + daysPerWeek * 60 + 18;
+  const minW = schedule.meta.detailMinWidth ?? naturalMinWidth;
+
   return (
     <div className="details-overlay">
       <div className="details-page">
@@ -163,7 +170,10 @@ export default function ScheduleDetails({ schedule, onClose }: { schedule: Sched
               {partitionMode === 'grid' ? '切换为水平' : '切换为平铺'}
             </button>
           </div>
-          <div className={`partition-grid ${partitionMode === 'horizontal' ? 'horizontal' : ''}`}>
+          <div
+            className={`partition-grid ${partitionMode === 'horizontal' ? 'horizontal' : ''}`}
+            style={partitionMode === 'grid' ? { gridTemplateColumns: `repeat(auto-fill, minmax(${minW}px, 1fr))` } : undefined}
+          >
             {partitions.map((p, i) => {
               const badges = new Map<string, string>();
               for (const it of p.items) {
@@ -176,7 +186,7 @@ export default function ScheduleDetails({ schedule, onClose }: { schedule: Sched
                 <div key={i} className="partition-card">
                   <div className="partition-head">{partitionLabel(p)}</div>
                   {p.items.length ? (
-                    <Timetable schedule={schedule} weekFilter="all" items={p.items} info={DETAIL_INFO} rowHeight={41} courseBadges={badges} blockBadges={blockBadges} />
+                    <Timetable schedule={schedule} weekFilter="all" items={p.items} info={DETAIL_INFO} rowHeight={rowH} courseBadges={badges} blockBadges={blockBadges} />
                   ) : (
                     <div className="muted empty">本周段无课程</div>
                   )}

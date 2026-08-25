@@ -12,6 +12,9 @@ process.chdir(HERE);
 // 1) 用 favicon.png 重新生成图标常量
 execSync('node gen-icon.mjs', { stdio: 'inherit', shell: true });
 
+// 1.5) 用 splash.png 重新生成启动小窗底图常量
+execSync('node gen-splash.mjs', { stdio: 'inherit', shell: true });
+
 // 2) cargo 构建
 execSync('cargo build --release', { stdio: 'inherit', shell: true });
 

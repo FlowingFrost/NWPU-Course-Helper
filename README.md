@@ -51,14 +51,21 @@ npm run build:ext     # 打包到 extension/dist/
 - 功能与使用说明、意愿值/评分算法、插件开发、FAQ：[开发说明.md](开发说明.md)
 - AI / 外部工具接口：[docs/AI接口协议.md](docs/AI接口协议.md)
 - 完整设计稿：[DESIGN.md](DESIGN.md)
+- **发布 / 代码签名（Windows）：[docs/发布与签名.md](docs/发布与签名.md)**
 
-创建分发
+## 创建分发
+
 ```bash
-npm run pack:src -- --version v0.2.5alpha
+# 打「源码版」zip（含 --version 时会同步更新本地 package.json 的版本号）
+npm run pack:src -- --version v0.5.0alpha
 ```
-在Windows端构建完整客户端
+
+在 Windows 端构建完整客户端（含托盘壳，需已装 Rust MSVC 工具链）：
+
 ```bash
 npm install
 npm run build:tray
-npm run pack:win
+npm run pack:win -- --version v0.5.0alpha
 ```
+
+产物在 `releases/windows-amd64-v<版本>/`（及同名 `.zip`）。Windows 下数据保存在 `%APPDATA%\CourseHelper`，正式对外发布前请按 [docs/发布与签名.md](docs/发布与签名.md) 做代码签名。

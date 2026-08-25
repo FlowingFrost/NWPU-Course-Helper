@@ -88,6 +88,9 @@ export interface Meta {
   resultLimit?: number;
   // 教材信息页显示哪些列（缺省=显示；false=隐藏）
   textbookColumns?: Partial<Record<TextbookColumnKey, boolean>>;
+  // 课表详情页：每张课表的行高（px，默认 41）与最小宽度（px，默认按天数列数自动计算）
+  detailRowHeight?: number;
+  detailMinWidth?: number;
 }
 
 // 教材信息页的列
@@ -173,4 +176,12 @@ export interface Schedule {
 export interface Settings {
   currentSaveId?: string; // 记忆：上次打开的存档
   port?: number; // 记忆：上次成功监听的端口（端口被占用自动切换后沿用）
+}
+
+// 存档的手动备份（列表项元信息；完整快照由后端以独立文件保存）
+export interface BackupMeta {
+  id: string;
+  name: string;
+  createdAt: number; // 毫秒时间戳
+  courseCount: number;
 }

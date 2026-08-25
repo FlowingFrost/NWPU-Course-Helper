@@ -264,6 +264,35 @@ export default function SettingsPanel({
           </Field>
           <p className="muted">把「上课课程集合相同」的周合并为一组（含单双周课、断续开课）；关闭后按连续周段独立拆开。</p>
 
+          <div className="options-head">课表宽高</div>
+          <div className="pref-row">
+            <Field label="详情课表行高">
+              <input
+                type="range"
+                min={28}
+                max={72}
+                step={1}
+                value={meta.detailRowHeight ?? 41}
+                onChange={(e) => setMeta({ detailRowHeight: Number(e.target.value) })}
+              />
+              <span className="row-h-val">{meta.detailRowHeight ?? 41}px</span>
+            </Field>
+            <button onClick={() => setMeta({ detailRowHeight: undefined })}>恢复默认</button>
+          </div>
+          <div className="pref-row">
+            <Field label="详情课表最小宽度">
+              <input
+                type="number"
+                min={320}
+                value={meta.detailMinWidth ?? ''}
+                placeholder={`自动（${52 + meta.daysPerWeek * 60 + 18}px）`}
+                onChange={(e) => setMeta({ detailMinWidth: e.target.value.trim() === '' ? undefined : num(e.target.value) })}
+              />
+              <span className="muted">px，留空=按天数列数自动计算（避免课表横向滚动）</span>
+            </Field>
+            <button onClick={() => setMeta({ detailMinWidth: undefined })}>恢复默认</button>
+          </div>
+
           {/* —— 教材信息 —— */}
           <div className="settings-category">📚 教材信息</div>
           <div className="options-head">显示列（在「教材」页表格中展示哪些列）</div>
