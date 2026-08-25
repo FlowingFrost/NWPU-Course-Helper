@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      body {
+        width: 260px;
+        margin: 0;
+        font: 13px/1.6 sans-serif;
+        color: #0f172a;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 14px;
+        margin: 0 0 8px;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 6px;
+      }
+      .dot.ok { background: #16a34a; }
+      .dot.err { background: #dc2626; }
+      button {
+        width: 100%;
+        padding: 6px 0;
+        border-radius: 6px;
+        border: 1px solid #cbd5e1;
+        background: #2563eb;
+        color: #fff;
+        cursor: pointer;
+        font: inherit;
+      }
+      button.secondary {
+        background: #f8fafc;
+        color: #0f172a;
+      }
+      .muted { color: #64748b; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <h1>选课助手·教务捕获</h1>
+    <div class="row">
+      <span>选课助手服务</span>
+      <span id="status"><span class="dot err"></span>检测中…</span>
+    </div>
+    <div class="row"><span>当前地址</span><span id="base" class="muted">—</span></div>
+    <button id="open">打开选课助手（全屏标签页）</button>
+    <div style="height:8px"></div>
+    <button id="options" class="secondary">设置</button>
+    <script src="popup.js"></script>
+  </body>
+</html>

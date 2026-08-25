@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      body {
+        font: 14px/1.7 sans-serif;
+        color: #0f172a;
+        padding: 20px;
+        max-width: 460px;
+      }
+      label { display: block; margin: 12px 0 4px; font-weight: 600; }
+      input, select {
+        width: 100%; padding: 6px 8px; border: 1px solid #cbd5e1;
+        border-radius: 6px; font: inherit; box-sizing: border-box;
+      }
+      button {
+        margin-top: 16px; padding: 7px 16px; border-radius: 6px;
+        border: 1px solid #cbd5e1; background: #2563eb; color: #fff;
+        cursor: pointer; font: inherit;
+      }
+      .muted { color: #64748b; font-size: 12px; }
+      #saved { color: #16a34a; margin-left: 10px; }
+    </style>
+  </head>
+  <body>
+    <h2>选课助手 · 插件设置</h2>
+    <label for="baseUrl">选课助手服务地址</label>
+    <input id="baseUrl" placeholder="http://localhost:3001" />
+    <p class="muted">WSL 下默认 localhost 转发即可；不通时填 WSL IP，如 http://172.31.2.39:3001</p>
+
+    <label for="category">「加入候选」默认类别</label>
+    <select id="category">
+      <option value="elective">非必修（elective，可选 0~K 门）</option>
+      <option value="required">必修（required，必选其一）</option>
+    </select>
+
+    <label><input type="checkbox" id="showUpdateResult" style="width:auto;margin-right:6px;" />更新课程信息后展示结果</label>
+    <p class="muted">点「更新已选人数」结束后，弹窗列出每条更新明细与未查到/未匹配的课程。</p>
+
+    <label for="pageLimit">翻页上限</label>
+    <input id="pageLimit" type="number" min="1" max="20" />
+    <p class="muted">一门课搜索结果最多翻几页（通常 1~2 页足够）。</p>
+
+    <label for="pageDelay">翻页间隔（毫秒）</label>
+    <input id="pageDelay" type="number" min="200" max="5000" step="100" />
+    <p class="muted">翻页之间等待多久，防止被教务系统限流。</p>
+
+    <div>
+      <button id="save">保存</button><span id="saved"></span>
+    </div>
+    <script src="options.js"></script>
+  </body>
+</html>

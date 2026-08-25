@@ -1,0 +1,31 @@
+[
+  {
+    "op": "add_course",
+    "name": "数据结构",
+    "category": "builtin",
+    "code": "U03G11010",
+    "credit": 3.5,
+    "options": [
+      {
+        "label": "张三 班",
+        "rating": 4.2,
+        "enrolled": 120,
+        "capacity": 100,
+        "segments": [
+          { "day": 1, "startNode": 3, "step": 2, "startWeek": 1, "endWeek": 16, "room": "教西B-201", "teacher": "张三" },
+          { "day": 3, "startNode": 3, "step": 2, "startWeek": 1, "endWeek": 16, "room": "教西B-201", "teacher": "张三" }
+        ]
+      }
+    ]
+  },
+  {
+    "op": "add_course",
+    "name": "操作系统",
+    "category": "required",
+    "code": "U03G11011",
+    "credit": 3.0,
+    "segments": [
+      { "day": 2, "startNode": 5, "step": 2, "startWeek": 1, "endWeek": 16, "room": "教东A-301", "teacher": "李四" }
+    ]
+  }
+]

@@ -1,0 +1,41 @@
+{
+  "name": "course-helper",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n web,api -c cyan,green \"vite\" \"tsx watch server/index.ts\"",
+    "build": "tsc --noEmit && vite build",
+    "start": "tsx server/index.ts",
+    "preview": "vite preview",
+    "test:ext": "tsx --test extension/test/*.test.ts",
+    "build:ext": "node extension/build.mjs",
+    "pack": "node scripts/pack.mjs",
+    "pack:win": "node scripts/pack.mjs --target win-x64",
+    "pack:linux": "node scripts/pack.mjs --target linux-x64",
+    "pack:src": "node scripts/pack-src.mjs"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.2.6",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsdom": "^30.0.0",
+    "@types/node": "^20.14.10",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "@yao-pkg/pkg": "^6.22.0",
+    "concurrently": "^8.2.2",
+    "esbuild": "^0.28.2",
+    "jsdom": "^30.0.1",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.3",
+    "vite": "^5.3.4"
+  }
+}

@@ -1,0 +1,222 @@
+[
+  {
+    "courseName": "系统可靠性评定方法",
+    "courseCode": "D01M11011",
+    "credit": "1",
+    "lessonCode": "D01M11011.01",
+    "lessonName": "全校",
+    "teacher": "薛小锋",
+    "enrolled": 0,
+    "capacity": 88,
+    "scheduleText": "3~6周 周六 第一节~第四节 友谊校区 诚字楼212 薛小锋"
+  },
+  {
+    "courseName": "理论空气动力学",
+    "courseCode": "D01M11046",
+    "credit": "1.5",
+    "lessonCode": "D01M11046.01",
+    "lessonName": "全校",
+    "teacher": "李杰",
+    "enrolled": 0,
+    "capacity": 80,
+    "scheduleText": "2~6周 周二 第一节~第四节 友谊校区 诚字楼225 李杰"
+  },
+  {
+    "courseName": "航空安全工程概论",
+    "courseCode": "M01M11023",
+    "credit": "2",
+    "lessonCode": "M01M11023.01",
+    "lessonName": "全校",
+    "teacher": "邓琼",
+    "enrolled": 0,
+    "capacity": 71,
+    "scheduleText": "3~10周 周六 第七节~第十节 友谊校区 诚字楼210 邓琼"
+  },
+  {
+    "courseName": "线性代数",
+    "courseCode": "U01G11001",
+    "credit": "2.5",
+    "lessonCode": "U01G11001.01",
+    "lessonName": "25级 航空 数学必修【重修或补修】",
+    "teacher": "李元",
+    "enrolled": 0,
+    "capacity": 30,
+    "scheduleText": "2~11周 周二 第十一节~第十二节 长安校区 教西C2-204 李元;  2~11周 周四 第十一节~第十二节 长安校区 教西C2-204 李元"
+  },
+  {
+    "courseName": "线性代数",
+    "courseCode": "U01G11001",
+    "credit": "2.5",
+    "lessonCode": "U01G11001.02",
+    "lessonName": "26级 【1院 黄玉珊班 强基班 必修】【其他专业勿选】",
+    "teacher": "杨扬",
+    "enrolled": 88,
+    "capacity": 85,
+    "scheduleText": "2~11周 周一 第十一节~第十二节 长安校区 教西B2-201 杨扬;  2~11周 周三 第十一节~第十二节 长安校区 教西B2-201 杨扬"
+  },
+  {
+    "courseName": "概率论与数理统计",
+    "courseCode": "U01G11002",
+    "credit": "3",
+    "lessonCode": "U01G11002.01",
+    "lessonName": "24级 航空 数学必修【重修或补修】",
+    "teacher": "王燕萍",
+    "enrolled": 0,
+    "capacity": 40,
+    "scheduleText": "2~13周 周二 第三节~第四节 长安校区 教西B1-304 王燕萍;  2~13周 周四 第三节~第四节 长安校区 教西B1-304 王燕萍"
+  },
+  {
+    "courseName": "概率论与数理统计",
+    "courseCode": "U01G11002",
+    "credit": "3",
+    "lessonCode": "U01G11002.02",
+    "lessonName": "25级 1院 黄玉珊班 强基班 必修【其他专业勿选】",
+    "teacher": "宋述芳",
+    "enrolled": 80,
+    "capacity": 93,
+    "scheduleText": "2~13周 周二 第一节~第二节 长安校区 教西A-106 宋述芳;  2~13周 周四 第一节~第二节 长安校区 教西A-106 宋述芳"
+  },
+  {
+    "courseName": "复变函数与积分变换",
+    "courseCode": "U01G11003",
+    "credit": "2",
+    "lessonCode": "U01G11003.01",
+    "lessonName": "25级 1院 黄玉珊班 强基班 必修",
+    "teacher": "王红建",
+    "enrolled": 80,
+    "capacity": 93,
+    "scheduleText": "2~9周 周一 第十一节~第十二节 长安校区 教西A-101 王红建;  2~9周 周三 第十一节~第十二节 长安校区 教西A-101 王红建"
+  },
+  {
+    "courseName": "计算方法",
+    "courseCode": "U01G11004",
+    "credit": "2",
+    "lessonCode": "U01G11004.01",
+    "lessonName": "25级【1院 飞控信 &飞设 必修】 & 【2院 飞设&飞控信&空天&飞动 限选】",
+    "teacher": "陶亮",
+    "enrolled": 0,
+    "capacity": 50,
+    "scheduleText": "2~8周 周二 第一节~第二节 长安校区 教西B1-303 陶亮;  2~8周 周四 第一节~第二节 长安校区 教西B1-303 陶亮;  9周 周二 第一节~第二节 长安校区 实验大楼B110（软件实验室） 陶亮;  9周 周四 第一节~第二节 长安校区 实验大楼B110（软件实验室） 陶亮"
+  },
+  {
+    "courseName": "计算方法",
+    "courseCode": "U01G11004",
+    "credit": "2",
+    "lessonCode": "U01G11004.02",
+    "lessonName": "25级【1院 飞控信 &飞设 必修】 & 【2院 飞设&飞控信&空天&飞动 限选】",
+    "teacher": "王波",
+    "enrolled": 0,
+    "capacity": 50,
+    "scheduleText": "2~9周 周二 第一节~第二节 长安校区 教西B1-204 王波;  2~9周 周四 第一节~第二节 长安校区 教西B1-204 王波"
+  },
+  {
+    "courseName": "计算方法",
+    "courseCode": "U01G11004",
+    "credit": "2",
+    "lessonCode": "U01G11004.03",
+    "lessonName": "25级【1院 飞控信 &飞设 必修】 & 【2院 飞设&飞控信&空天&飞动 限选】",
+    "teacher": "李彪",
+    "enrolled": 0,
+    "capacity": 50,
+    "scheduleText": "2~9周 周二 第一节~第二节 长安校区 教西B1-203 李彪;  2~9周 周四 第一节~第二节 长安校区 教西B1-203 李彪"
+  },
+  {
+    "courseName": "计算方法",
+    "courseCode": "U01G11004",
+    "credit": "2",
+    "lessonCode": "U01G11004.04",
+    "lessonName": "25级【1院 飞控信 &飞设 必修】 & 【2院 飞设&飞控信&空天&飞动 限选】",
+    "teacher": "李建国",
+    "enrolled": 0,
+    "capacity": 50,
+    "scheduleText": "2~9周 周一 第十一节~第十二节 长安校区 教西B1-202 李建国;  2~9周 周三 第十一节~第十二节 长安校区 教西B1-202 李建国"
+  },
+  {
+    "courseName": "大国重器：运输机的研制历程",
+    "courseCode": "U01G11006",
+    "credit": "1",
+    "lessonCode": "U01G11006.01",
+    "lessonName": "25级 1院【黄玉珊班 必修】&【强基班 必修】【全校选修】",
+    "teacher": "崔卫民",
+    "enrolled": 80,
+    "capacity": 100,
+    "scheduleText": "10~17周 周六 第七节~第八节 长安校区 教东D1-204 崔卫民"
+  },
+  {
+    "courseName": "大国重器：华夏龙腾-中国飞机发展侧记",
+    "courseCode": "U01G11008",
+    "credit": "1",
+    "lessonCode": "U01G11008.01",
+    "lessonName": "26级 【1院 黄玉珊班 强基班 必修】& 【全校选修】",
+    "teacher": "宣建林",
+    "enrolled": 88,
+    "capacity": 100,
+    "scheduleText": "8周 周六 第一节~第四节 长安校区 教东D1-304 宣建林;  8周 周六 第七节~第十节 长安校区 教东D1-304 宣建林;  8周 周日 第一节~第四节 长安校区 教东D1-304 宣建林;  8周 周日 第七节~第十节 长安校区 教东D1-304 宣建林"
+  },
+  {
+    "courseName": "力学导论",
+    "courseCode": "U01G11010",
+    "credit": "1",
+    "lessonCode": "U01G11010.01",
+    "lessonName": "26级 力学拔尖必修【置入】其他同学可以选修",
+    "teacher": "索涛",
+    "enrolled": 20,
+    "capacity": 50,
+    "scheduleText": "10~17周 周五 第七节~第八节 长安校区 教西C3-304 索涛"
+  },
+  {
+    "courseName": "张量分析",
+    "courseCode": "U01G11011",
+    "credit": "1",
+    "lessonCode": "U01G11011.01",
+    "lessonName": "25级 力学拔尖 必修【置入】",
+    "teacher": "徐翱 ,景泽",
+    "enrolled": 20,
+    "capacity": 20,
+    "scheduleText": "1~3周 周二 第七节~第八节 长安校区 教东B2-104 徐翱;  1~3周 周五 第七节~第八节 长安校区 教东B2-104 徐翱;  4周 周二 第七节~第八节 长安校区 教东B2-104 景泽;  4周 周五 第七节~第八节 长安校区 教东B2-104 景泽"
+  },
+  {
+    "courseName": "中国航空史",
+    "courseCode": "U01G11012",
+    "credit": "1.5",
+    "lessonCode": "U01G11012.01",
+    "lessonName": "全校可选 文明与科技类课程",
+    "teacher": "安伟刚 ,刘斌",
+    "enrolled": 0,
+    "capacity": 120,
+    "scheduleText": "10~14周 周二 第十一节~第十三节 长安校区 教西D-104 安伟刚;  15~17周 周二 第十一节~第十三节 长安校区 教西D-104 刘斌"
+  },
+  {
+    "courseName": "飞行原理与名机赏析",
+    "courseCode": "U01G11015",
+    "credit": "1.5",
+    "lessonCode": "U01G11015.01",
+    "lessonName": "全校可选 文明与科技类课程",
+    "teacher": "刘艳",
+    "enrolled": 0,
+    "capacity": 120,
+    "scheduleText": "1~8周 周六 第二节~第四节 长安校区 教西C1-201 刘艳"
+  },
+  {
+    "courseName": "复变函数(英)",
+    "courseCode": "U01G12002",
+    "credit": "1",
+    "lessonCode": "U01G12002.01",
+    "lessonName": "25级 1院【英文班 必修】",
+    "teacher": "谷迎松",
+    "enrolled": 25,
+    "capacity": 40,
+    "scheduleText": "13~16周 周一 第九节~第十节 长安校区 教东C-508 谷迎松;  13~16周 周三 第九节~第十节 长安校区 教东C-508 谷迎松"
+  },
+  {
+    "courseName": "计算方法及其程序设计(英)",
+    "courseCode": "U01G12003",
+    "credit": "2",
+    "lessonCode": "U01G12003.01",
+    "lessonName": "24级 1院【英文班 必修】",
+    "teacher": "王栋",
+    "enrolled": 13,
+    "capacity": 18,
+    "scheduleText": "1~8周 周一 第七节~第八节 友谊校区 西馆XA304 王栋;  1~8周 周三 第七节~第八节 友谊校区 西馆XA304 王栋"
+  }
+]
