@@ -13,7 +13,8 @@
     "pack": "node scripts/pack.mjs",
     "pack:win": "node scripts/pack.mjs --target win-x64",
     "pack:linux": "node scripts/pack.mjs --target linux-x64",
-    "pack:src": "node scripts/pack-src.mjs"
+    "pack:src": "node scripts/pack-src.mjs",
+    "build:tray": "node tray/build.mjs"
   },
   "dependencies": {
     "cors": "^2.8.5",

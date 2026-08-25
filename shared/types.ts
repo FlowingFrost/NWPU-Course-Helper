@@ -73,4 +73,5 @@ export interface Schedule {
 
 export interface Settings {
   currentSaveId?: string; // 记忆：上次打开的存档
+  port?: number; // 记忆：上次成功监听的端口（端口被占用自动切换后沿用）
 }

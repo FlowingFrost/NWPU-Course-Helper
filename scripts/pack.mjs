@@ -70,18 +70,29 @@ await esbuildBuild({
 // 4) pkg → 可执行文件
 fs.mkdirSync(releaseDir, { recursive: true });
 console.log(`\n$ pkg .pack/server.cjs --targets ${target} --output ${exeRel}`);
-await pkgExec(['.pack/server.cjs', '--targets', target, '--output', exeRel]);
+// --public + --public-packages '*'：跨平台（如 Linux 打 Windows）时字节码会因 host/target
+// V8 不一致被拒绝（报 "V8 rejected the bytecode cache"），改用明文源码代替字节码规避。
+await pkgExec(['.pack/server.cjs', '--targets', target, '--output', exeRel, '--public', '--public-packages', '*']);
 
-// 5) 组装发布目录：可执行文件 + 网页 dist/ + 浏览器插件 extension/
+// 5) 组装发布目录：可执行文件 + 网页 dist/ + 浏览器插件 extension/（+ 托盘壳，若已构建）
 cp('dist', path.join(releaseDir, 'dist'));
 cp('extension/dist', path.join(releaseDir, 'extension'));
+
+const trayExe = path.join('tray', 'course-helper-tray.exe');
+const hasTray = process.platform === 'win32' && fs.existsSync(trayExe);
+if (hasTray) {
+  cp(trayExe, path.join(releaseDir, 'CourseHelperTray.exe'));
+}
+
 fs.writeFileSync(
   path.join(releaseDir, 'README.txt'),
   [
     `选课助手 CourseHelper ${version}`,
     '',
     '【网页版】',
-    `1. 双击 CourseHelper${exeExt}`,
+    ...(hasTray
+      ? ['1. 双击 CourseHelperTray.exe（常驻托盘，自动打开网页）', '   · 右键托盘图标可「打开网站 / 退出」']
+      : [`1. 双击 CourseHelper${exeExt}`]),
     '2. 浏览器打开 http://localhost:3001',
     '   （首次运行会在本文件夹生成 data/ 保存数据）',
     '',

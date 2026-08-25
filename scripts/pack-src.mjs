@@ -27,7 +27,13 @@ const stageDir = path.join('releases', name);
 const zipPath = path.join('releases', `${name}.zip`);
 
 // 源码包排除项（按目录名/文件名匹配）
-const EXCLUDE_DIRS = new Set(['node_modules', 'dist', 'data', '.npm-cache', '.pack', 'pack', 'releases', 'release', '.git']);
+const EXCLUDE_DIRS = new Set([
+  'node_modules', 'dist', 'data', '.npm-cache', '.pack', 'pack', 'releases', 'release', '.git',
+  'test',    // 单元测试（extension/test 及其 fixtures）
+  'docs',    // 参考文档与示例（非运行所需）
+  'target',  // Rust 构建产物（tray/target）
+]);
+const EXCLUDE_FILES = new Set(['DESIGN.md', '开发说明.md']); // 设计/开发文档（非运行所需）
 
 function copyTree(src, dst) {
   fs.mkdirSync(dst, { recursive: true });
@@ -38,7 +44,8 @@ function copyTree(src, dst) {
       if (EXCLUDE_DIRS.has(entry.name)) continue;
       copyTree(s, d);
     } else if (entry.isFile()) {
-      if (entry.name.endsWith('.log') || entry.name === '.DS_Store') continue;
+      if (EXCLUDE_FILES.has(entry.name)) continue;
+      if (entry.name.endsWith('.test.ts') || entry.name.endsWith('.log') || entry.name === '.DS_Store') continue;
       fs.copyFileSync(s, d);
     }
   }

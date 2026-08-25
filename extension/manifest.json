@@ -5,9 +5,8 @@
   "description": "捕获教务系统「全校开课查询」页面信息，一键导入本地选课助手。不接触账号密码，仅复用当前已登录会话。",
   "permissions": ["storage", "tabs"],
   "host_permissions": [
-    "http://localhost:3001/*",
-    "http://127.0.0.1:3001/*",
-    "http://localhost:5173/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*",
     "https://jwxt.nwpu.edu.cn/*"
   ],
   "background": { "service_worker": "background.js" },

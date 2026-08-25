@@ -14,7 +14,7 @@ const DATA_DIR = path.join(BASE, 'data');
 const BACKUP_DIR = path.join(DATA_DIR, 'backup');
 const SAVES_DIR = path.join(DATA_DIR, 'saves');
 const SETTINGS_PATH = path.join(DATA_DIR, 'settings.json');
-const PORT = Number(process.env.PORT ?? 3001);
+const DEFAULT_PORT = 3001;
 
 // 默认节次时间表（西北工业大学）
 const DEFAULT_NODE_TIMES: NodeTime[] = [
@@ -265,6 +265,49 @@ if (fs.existsSync(dist)) {
   app.use(express.static(dist));
 }
 
-app.listen(PORT, () => {
-  console.log(`[course-helper] API 已启动：http://localhost:${PORT}`);
-});
+// —— 端口自动选择与记忆 ——
+// 端口被占用时自动向后顺延，并把成功端口写入 settings，下次启动沿用，
+// 减少用户反复修改插件「服务地址」的次数。
+function preferredPort(): number {
+  const env = Number(process.env.PORT);
+  if (env && Number.isInteger(env)) return env;
+  const saved = readSettings().port;
+  if (saved && Number.isInteger(saved)) return saved;
+  return DEFAULT_PORT;
+}
+
+function persistPort(port: number) {
+  try {
+    const settings = readSettings();
+    if (settings.port !== port) {
+      settings.port = port;
+      atomicWrite(SETTINGS_PATH, settings, false);
+    }
+  } catch {
+    /* 忽略：记不住端口不影响本次运行 */
+  }
+}
+
+function startServer(port: number, attemptsLeft: number) {
+  const server = app.listen(port, () => {
+    console.log(`[course-helper] API 已启动：http://localhost:${port}`);
+    console.log('（保持本窗口开启；关闭窗口即停止服务）');
+    persistPort(port);
+  });
+  server.on('error', (err) => {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === 'EADDRINUSE' && attemptsLeft > 0) {
+      console.warn(`[course-helper] 端口 ${port} 已被占用，自动改用 ${port + 1} …`);
+      startServer(port + 1, attemptsLeft - 1);
+    } else {
+      console.error('\n[course-helper] 启动失败：' +
+        (code === 'EADDRINUSE'
+          ? `端口 ${port} 及其后若干端口均被占用，请释放端口后重试。`
+          : ((err as Error).message || String(err))));
+      console.error('关闭本窗口即可退出。');
+      setInterval(() => {}, 1 << 30); // 保持窗口，便于阅读错误信息
+    }
+  });
+}
+
+startServer(preferredPort(), 20);
