@@ -1,17 +1,17 @@
 import { extractCheckedLessonsFromDom, rowElementToRawLesson } from './domExtractor';
 import { adaptJsonSearchResponse } from './jsonAdapter';
-import { elTableRowToSelectionLesson, elTableRowToRawLesson, extractSelectedLessonsFromDom } from './selectionExtractor';
+import { elTableRowToSelectionLesson, elTableRowToRawLesson, extractSelectedRawLessonsFromDom } from './selectionExtractor';
 import type { RawLesson } from './model';
-import type { Category, Schedule } from '../../shared/types';
+import type { Category, Schedule, NoticeItem, TextbookEntry, TextbookRow } from '../../shared/types';
+import type { Command } from '../../shared/commands';
 import type { ExtMessage, ExtResponse } from './messaging';
 import { loadSettings } from './messaging';
 import { buildPreviewElement } from './preview';
-import { buildEnrollmentReport, buildUpdateCommands, buildActualSelectionCommand, summarizeSelectedRefs, courseCodesOf, type UpdateReport } from './updateEnrollment';
-import type { SelectedLessonRef } from './selectionExtractor';
+import { buildUpdateCommands, buildActualSelectionCommand, summarizeSelectedRefs, buildAddMissingSelectedCommands, buildWillingCommands, buildNoticeItems, courseCodesOf } from './updateEnrollment';
 
-// 全校开课查询接口所需的 assembleFields（与页面内联脚本一致）
+// 全校开课查询接口所需的 assembleFields（与页面内联脚本一致；course.id 用于详情页教材信息）
 const ASSEMBLE_FIELDS =
-  'course.code,minorCourse.nameZh,courseType,openDepartment,teacherAssignmentList,examMode,campus,teachLang,roomType,timeTableLayout,crossBizTypes,courseProperty';
+  'course.id,course.code,minorCourse.nameZh,courseType,openDepartment,teacherAssignmentList,examMode,campus,teachLang,roomType,timeTableLayout,crossBizTypes,courseProperty';
 
 function isLessonSearch(): boolean {
   return /\/lesson-search/.test(location.pathname);
@@ -21,8 +21,12 @@ function isCourseSelection(): boolean {
   return /course-selection|course-select/.test(location.pathname);
 }
 
+function isCourseTable(): boolean {
+  return /course-table/.test(location.pathname);
+}
+
 function semesterId(): string | null {
-  const el = document.querySelector<HTMLSelectElement>('#semester');
+  const el = document.querySelector<HTMLSelectElement>('#semester') ?? document.querySelector<HTMLSelectElement>('#semesters');
   const v = el?.value;
   return v ? String(v) : null;
 }
@@ -49,6 +53,11 @@ function toast(text: string, isError = false) {
 
 async function send(msg: ExtMessage): Promise<ExtResponse> {
   try {
+    // 扩展被重载后，页面里残留的旧 content script 的 chrome.runtime 会失效（变为 undefined），
+    // 此时给出明确提示，让用户刷新教务页面重新注入新的 content script。
+    if (!chrome?.runtime?.sendMessage) {
+      return { ok: false, error: '扩展已更新，请刷新当前教务页面后重试' };
+    }
     return await chrome.runtime.sendMessage(msg);
   } catch (e) {
     return { ok: false, error: String(e) };
@@ -68,6 +77,7 @@ async function importLessons(lessons: RawLesson[], category: Category) {
   const selectable = isCourseSelection();
   const resp = await send({ type: 'IMPORT_LESSONS', lessons, category, selectable });
   if (resp.ok) {
+    invalidateScheduleCache();
     toast(`已${IMPORT_ACTION_LABEL[category]}：导入后共 ${resp.courseCount} 门课`);
   } else {
     toast(`导入失败：${resp.error || '未知错误'}（选课助手服务是否已启动？）`, true);
@@ -187,115 +197,6 @@ async function searchSelectionByCode(code: string, pageLimit: number, pageDelay:
   return out;
 }
 
-// 结果弹窗：列出全部更新明细 + 未查到的课程 + 未匹配的教学班 + 已选课程同步
-function showSummaryModal(report: UpdateReport, selected?: { lessons: number; courses: number } | null) {
-  document.querySelector('.ch-summary-modal')?.remove();
-  const overlay = document.createElement('div');
-  overlay.className = 'ch-summary-modal';
-  overlay.style.cssText =
-    'position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;';
-  const box = document.createElement('div');
-  box.style.cssText =
-    'background:#fff;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.25);width:680px;max-width:92vw;max-height:82vh;display:flex;flex-direction:column;font:13px/1.5 sans-serif;color:#0f172a;';
-
-  const head = document.createElement('div');
-  head.style.cssText = 'padding:12px 16px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;';
-  const title = document.createElement('b');
-  title.textContent = `更新结果（${report.updates.length} 个候选更新${report.selectableUpdates.length ? `，${report.selectableUpdates.length} 个开放选课变化` : ''}）`;
-  const close = document.createElement('button');
-  close.textContent = '✕';
-  close.style.cssText = 'border:none;background:none;cursor:pointer;font-size:16px;color:#64748b;';
-  close.onclick = () => overlay.remove();
-  head.appendChild(title);
-  head.appendChild(close);
-  box.appendChild(head);
-
-  const body = document.createElement('div');
-  body.style.cssText = 'padding:12px 16px;overflow:auto;';
-
-  const section = (label: string) => {
-    const d = document.createElement('div');
-    d.style.cssText = 'margin:4px 0 8px;font-weight:700;';
-    d.textContent = label;
-    return d;
-  };
-
-  // 更新明细
-  body.appendChild(section('已更新'));
-  if (report.updates.length) {
-    const ul = document.createElement('ul');
-    ul.style.cssText = 'list-style:none;margin:0 0 12px;padding:0;';
-    for (const u of report.updates) {
-      const li = document.createElement('li');
-      li.textContent = `${u.courseName}（${u.label}）：已选 ${u.oldEnrolled}→${u.enrolled}，容量 ${u.oldCapacity}→${u.capacity}`;
-      li.style.cssText = 'padding:3px 0;border-bottom:1px solid #f1f5f9;';
-      ul.appendChild(li);
-    }
-    body.appendChild(ul);
-  } else {
-    const p = document.createElement('div');
-    p.textContent = '没有需要更新的候选（已选人数无变化）。';
-    p.style.cssText = 'color:#64748b;margin-bottom:12px;';
-    body.appendChild(p);
-  }
-
-  // 是否开放选课 变化
-  if (report.selectableUpdates.length) {
-    body.appendChild(section(`是否开放选课（${report.selectableUpdates.length} 个变化）`));
-    const ul = document.createElement('ul');
-    ul.style.cssText = 'list-style:none;margin:0 0 12px;padding:0;color:#1d4ed8;';
-    for (const s of report.selectableUpdates) {
-      const li = document.createElement('li');
-      li.textContent = `${s.courseName}（${s.label}）：${s.oldSelectable ? '开放' : '不开放'}→${s.selectable ? '开放' : '不开放'}`;
-      li.style.cssText = 'padding:3px 0;border-bottom:1px solid #f1f5f9;';
-      ul.appendChild(li);
-    }
-    body.appendChild(ul);
-  }
-
-  // 已选课程同步
-  if (selected) {
-    body.appendChild(section('已选课程同步'));
-    const p = document.createElement('div');
-    p.textContent = `已同步教务「已选课程」：${selected.courses} 门课程 / ${selected.lessons} 个教学班（用于前端「选课情况」校验是否完成选课）。`;
-    p.style.cssText = 'color:#16a34a;margin-bottom:12px;';
-    body.appendChild(p);
-  }
-
-  // 未查到的课程
-  if (report.notFoundCourses.length) {
-    body.appendChild(section(`未查到课程（${report.notFoundCourses.length}）`));
-    const ul = document.createElement('ul');
-    ul.style.cssText = 'list-style:none;margin:0 0 12px;padding:0;color:#dc2626;';
-    for (const c of report.notFoundCourses) {
-      const li = document.createElement('li');
-      li.textContent = c.code ? `${c.name}（${c.code}）` : c.name;
-      li.style.cssText = 'padding:3px 0;border-bottom:1px solid #f1f5f9;';
-      ul.appendChild(li);
-    }
-    body.appendChild(ul);
-  }
-
-  // 未匹配的教学班编号（同一课程分组，课程名只出现一次）
-  if (report.notFoundOptions.length) {
-    const total = report.notFoundOptions.reduce((n, g) => n + g.labels.length, 0);
-    body.appendChild(section(`未匹配教学班编号（${total} 个）`));
-    const ul = document.createElement('ul');
-    ul.style.cssText = 'list-style:none;margin:0 0 12px;padding:0;color:#b45309;';
-    for (const g of report.notFoundOptions) {
-      const li = document.createElement('li');
-      li.textContent = `${g.courseName}：${g.labels.join('、')}`;
-      li.style.cssText = 'padding:3px 0;border-bottom:1px solid #f1f5f9;';
-      ul.appendChild(li);
-    }
-    body.appendChild(ul);
-  }
-
-  box.appendChild(body);
-  overlay.appendChild(box);
-  document.body.appendChild(overlay);
-}
-
 // 切换到「已选课程」tab（选课 SPA 主 tab，id 固定为 #tab-selectedLesson）
 async function ensureSelectedLessonTab(): Promise<boolean> {
   const tab = document.getElementById('tab-selectedLesson') as HTMLElement | null;
@@ -306,17 +207,16 @@ async function ensureSelectedLessonTab(): Promise<boolean> {
   return tab.classList.contains('is-active');
 }
 
-// 收集教务「已选课程」tab 里实际已完成选课的教学班编号。
+// 收集教务「已选课程」tab 里实际已完成选课的教学班（完整 RawLesson）。
 // 返回 null 表示该页面没有「已选课程」tab（无法收集），调用方应跳过同步。
-async function collectSelectedLessons(): Promise<SelectedLessonRef[] | null> {
+async function collectSelectedRawLessons(): Promise<RawLesson[] | null> {
   if (!(await ensureSelectedLessonTab())) return null;
   await sleep(300);
-  return extractSelectedLessonsFromDom(document);
+  return extractSelectedRawLessonsFromDom(document);
 }
 
-// 批量更新已选课程：驱动选课系统按存档课程编号逐门搜索回填已选人数/容量，
-// 再切到「已选课程」tab 收集实际选课结果回写存档（供前端「选课情况」校验）。
-async function updateEnrollments() {
+// 更新课程数据（对应「全部课程」tab）：按存档课程编号逐门搜索，回填已选人数/容量 + 是否开放选课。
+async function updateCourseData() {
   const schedule = await getSchedule();
   if (!schedule) {
     toast('无法获取选课助手存档（服务是否已启动？）', true);
@@ -329,7 +229,7 @@ async function updateEnrollments() {
     return;
   }
 
-  toast(`开始更新已选课程（共 ${codes.length} 门课）…`);
+  toast(`开始更新课程数据（共 ${codes.length} 门课）…`);
   const lessons: RawLesson[] = [];
   for (let i = 0; i < codes.length; i++) {
     try {
@@ -342,13 +242,9 @@ async function updateEnrollments() {
     await sleep(settings.updatePageDelay);
   }
 
-  const report = buildEnrollmentReport(schedule, lessons);
+  const notices = buildNoticeItems(schedule, lessons);
   const commands = buildUpdateCommands(schedule, lessons);
-
-  // 新增：切到「已选课程」tab，收集实际已完成选课的课程/教学班编号，回写存档供前端「选课情况」校验
-  const selectedRefs = await collectSelectedLessons();
-  const selected = selectedRefs ? summarizeSelectedRefs(selectedRefs) : null;
-  if (selectedRefs) commands.push(buildActualSelectionCommand(selectedRefs));
+  if (notices.length) commands.push({ op: 'add_notices', source: 'courseData', items: notices });
 
   if (commands.length) {
     const resp = await send({ type: 'APPLY_COMMANDS', commands });
@@ -356,16 +252,59 @@ async function updateEnrollments() {
       toast('更新失败：' + (resp.error || '未知'), true);
       return;
     }
+    invalidateScheduleCache();
   }
 
-  if (settings.showUpdateResult) showSummaryModal(report, selected);
-  else {
-    toast(
-      `更新完成：${report.updates.length} 个候选更新` +
-        (selected ? `，同步已选 ${selected.courses} 门` : '') +
-        (report.notFoundCourses.length ? `，${report.notFoundCourses.length} 门课未查到` : ''),
-    );
+  toast(notices.length ? `更新完成：已记录 ${notices.length} 条变动通知（在「通知」页查看）` : '更新完成：无字段变动');
+}
+
+// 更新已选课程（对应「已选课程」tab）：查询当前已选课程，回写实际选课结果；
+// 存档里不存在的课程完整添加（内置类）。
+async function updateSelectedCourses() {
+  const schedule = await getSchedule();
+  if (!schedule) {
+    toast('无法获取选课助手存档（服务是否已启动？）', true);
+    return;
   }
+
+  toast('开始更新已选课程…');
+  const selectedLessons = await collectSelectedRawLessons();
+  if (selectedLessons === null) {
+    toast('当前页面没有「已选课程」tab，无法同步', true);
+    return;
+  }
+  if (!selectedLessons.length) {
+    toast('「已选课程」里没有内容', true);
+    return;
+  }
+
+  const addedCommands = buildAddMissingSelectedCommands(schedule, selectedLessons);
+  const added = addedCommands.length; // 新增的课程（含补教学班）
+  const willingCommands = buildWillingCommands(schedule, selectedLessons);
+  const willingCount = willingCommands.length;
+
+  const selected = summarizeSelectedRefs(selectedLessons);
+  const summaryItems: NoticeItem[] = [
+    { kind: 'summary', courseName: '', label: '', oldText: '', newText: `同步已选 ${selected.courses} 门 / ${selected.lessons} 个教学班` },
+  ];
+  if (added) summaryItems.push({ kind: 'summary', courseName: '', label: '', oldText: '', newText: `新增 ${added} 门课` });
+  if (willingCount) summaryItems.push({ kind: 'summary', courseName: '', label: '', oldText: '', newText: `覆写意愿值 ${willingCount} 门` });
+
+  const commands: Command[] = [
+    ...addedCommands,
+    ...willingCommands,
+    buildActualSelectionCommand(selectedLessons),
+    { op: 'add_notices', source: 'selectedCourses', items: summaryItems },
+  ];
+
+  const resp = await send({ type: 'APPLY_COMMANDS', commands });
+  if (!resp.ok) {
+    toast('更新失败：' + (resp.error || '未知'), true);
+    return;
+  }
+  invalidateScheduleCache();
+
+  toast(`更新完成：${summaryItems.map((i) => i.newText).join('，')}（在「通知」页查看）`);
 }
 
 // —— 预览：悬停时拉取存档并弹迷你课表 ——
@@ -384,6 +323,13 @@ async function getSchedule(): Promise<Schedule | null> {
     return resp.schedule;
   }
   return null;
+}
+
+// 作废预览缓存：任何改动存档的操作（导入/更新）成功后调用，
+// 让下一次预览/更新立即重新拉取最新存档，避免 5 秒缓存导致的更新延迟。
+function invalidateScheduleCache() {
+  scheduleCache = null;
+  scheduleCacheAt = 0;
 }
 
 function hidePreviewNow() {
@@ -635,25 +581,147 @@ function fixTabOverlay() {
   }
 }
 
-// 在「我的选课状态」按钮左侧加「更新已选课程」按钮
+// 在「我的选课状态」按钮左侧加两个按钮：更新课程数据（全部课程）、更新已选课程（已选课程）
 function injectSelectionUpdateButton() {
   if (document.querySelector('.ch-update-btn')) return;
   const statusBtn = findButtonByText('我的选课状态');
   if (!statusBtn) return;
 
-  const btn = document.createElement('button');
-  btn.className = 'ch-update-btn';
-  btn.type = 'button';
-  btn.textContent = '更新已选课程';
-  btn.title = '先切到「全部课程」逐门查询回填已选人数/容量，再切到「已选课程」同步实际选课结果（用于前端「选课情况」校验）';
-  btn.style.cssText =
-    'margin-right:8px;padding:7px 15px;border-radius:4px;' +
-    'border:1px solid #16a34a;background:#f0fdf4;color:#166534;cursor:pointer;font:12px sans-serif;line-height:1;';
-  btn.addEventListener('click', async () => {
-    await ensureAllLessonTab();
-    await updateEnrollments();
+  const makeBtn = (text: string, title: string, onClick: () => void, green: boolean) => {
+    const btn = document.createElement('button');
+    btn.className = 'ch-update-btn';
+    btn.type = 'button';
+    btn.textContent = text;
+    btn.title = title;
+    btn.style.cssText =
+      'margin-right:8px;padding:7px 15px;border-radius:4px;cursor:pointer;font:12px sans-serif;line-height:1;' +
+      (green
+        ? 'border:1px solid #16a34a;background:#f0fdf4;color:#166534;'
+        : 'border:1px solid #2563eb;background:#eff6ff;color:#1e40af;');
+    btn.addEventListener('click', onClick);
+    return btn;
+  };
+
+  const dataBtn = makeBtn(
+    '更新课程数据',
+    '切到「全部课程」，按存档课程编号逐门查询，回填已选人数/容量与是否开放选课',
+    async () => {
+      await ensureAllLessonTab();
+      await updateCourseData();
+    },
+    false,
+  );
+
+  const selectedBtn = makeBtn(
+    '更新已选课程',
+    '切到「已选课程」，同步当前已选课程，并把存档里不存在的课程完整添加',
+    async () => {
+      await ensureSelectedLessonTab();
+      await updateSelectedCourses();
+    },
+    true,
+  );
+
+  statusBtn.insertAdjacentElement('beforebegin', selectedBtn);
+  statusBtn.insertAdjacentElement('beforebegin', dataBtn);
+}
+
+// —— 导出教材信息 ——
+
+// 从「我的课表」页解析课表内课程的编号：<td class="courseInfo" data-course="名称[编号]">
+function courseCodesFromTimetable(): string[] {
+  const codes = new Set<string>();
+  document.querySelectorAll('td.courseInfo[data-course]').forEach((td) => {
+    const m = /\[([^\]]+)\]$/.exec(td.getAttribute('data-course') ?? '');
+    if (m && m[1].trim()) codes.add(m[1].trim());
   });
-  statusBtn.insertAdjacentElement('beforebegin', btn);
+  return [...codes];
+}
+
+// 解析课程详情页里的教材信息表格（.textbook-table）
+function parseTextbookTable(html: string): TextbookRow[] {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const table = doc.querySelector('table.textbook-table');
+  if (!table) return [];
+  const rows: TextbookRow[] = [];
+  table.querySelectorAll('tbody tr').forEach((tr) => {
+    const cells = Array.from(tr.querySelectorAll('td')).map((td) => (td.textContent ?? '').replace(/\s+/g, ' ').trim());
+    if (cells.length < 8) return;
+    rows.push({
+      type: cells[0] || '',
+      index: cells[1] || '',
+      name: cells[2] || '',
+      author: cells[3] || '',
+      isbn: cells[4] || '',
+      publisher: cells[5] || '',
+      edition: cells[6] || '',
+      pubDate: cells[7] || '',
+    });
+  });
+  return rows;
+}
+
+// 拉取课程详情页并提取教材信息
+async function fetchTextbookDetail(infoId: string): Promise<TextbookRow[]> {
+  const url = `/student/for-std/lesson-search/info/${encodeURIComponent(infoId)}`;
+  const r = await fetch(url, { credentials: 'include' });
+  if (!r.ok) return [];
+  return parseTextbookTable(await r.text());
+}
+
+// 导出教材信息：课表内课程 → 查询拿到详情 id → 拉详情页 → 提取教材表格 → 写回存档
+async function exportTextbooks() {
+  const codes = courseCodesFromTimetable();
+  if (!codes.length) {
+    toast('课表里没有课程', true);
+    return;
+  }
+
+  toast(`开始导出教材信息（共 ${codes.length} 门课）…`);
+  const entries: TextbookEntry[] = [];
+  for (let i = 0; i < codes.length; i++) {
+    const code = codes[i];
+    try {
+      const lessons = await queryCourseByCode(code);
+      const first = lessons.find((l) => l.courseCode === code && l.infoId) ?? lessons.find((l) => l.infoId);
+      if (!first) {
+        entries.push({ courseCode: code, courseName: lessons[0]?.courseName || code, rows: [] });
+      } else {
+        const rows = await fetchTextbookDetail(first.infoId!);
+        entries.push({ courseCode: first.courseCode || code, courseName: first.courseName || code, rows });
+      }
+    } catch {
+      entries.push({ courseCode: code, courseName: code, rows: [] });
+    }
+    toast(`导出进度 ${i + 1}/${codes.length}…`);
+    await sleep(300);
+  }
+
+  const resp = await send({ type: 'APPLY_COMMANDS', commands: [{ op: 'set_textbooks', entries }] });
+  if (!resp.ok) {
+    toast('导出失败：' + (resp.error || '未知'), true);
+    return;
+  }
+  invalidateScheduleCache();
+  const withRows = entries.filter((e) => e.rows.length).length;
+  toast(`导出完成：${entries.length} 门课，${withRows} 门有教材信息（在「教材信息」页查看）`);
+}
+
+// 在「返回」按钮旁加「导出教材信息」按钮
+function injectTextbookExportButton() {
+  if (document.querySelector('.ch-textbook-export-btn')) return;
+  const backBtn = document.getElementById('page-back');
+  if (!backBtn || !backBtn.parentElement) return;
+
+  const btn = document.createElement('button');
+  btn.className = 'ch-textbook-export-btn';
+  btn.type = 'button';
+  btn.textContent = '导出教材信息';
+  btn.title = '读取课表内课程的教材信息，写入选课助手「教材信息」页';
+  btn.style.cssText =
+    'margin-left:10px;padding:6px 14px;border-radius:4px;border:1px solid #2563eb;background:#2563eb;color:#fff;cursor:pointer;font:13px sans-serif;line-height:1.4;';
+  btn.addEventListener('click', exportTextbooks);
+  backBtn.insertAdjacentElement('afterend', btn);
 }
 
 // —— 入口 ——
@@ -691,6 +759,18 @@ if (isLessonSearch()) {
       injectSelectionUpdateButton();
       injectAllSelectionRowButtons();
     });
+    observer.observe(document.body, { childList: true, subtree: true });
+  };
+  start();
+} else if (isCourseTable()) {
+  const start = () => {
+    if (!document.body) {
+      window.setTimeout(start, 200);
+      return;
+    }
+    injectTextbookExportButton();
+    // 课表页可能异步渲染，观察并补注按钮
+    const observer = new MutationObserver(() => injectTextbookExportButton());
     observer.observe(document.body, { childList: true, subtree: true });
   };
   start();

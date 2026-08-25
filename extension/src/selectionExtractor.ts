@@ -95,3 +95,38 @@ export function extractSelectedLessonsFromDom(doc: Document): SelectedLessonRef[
     .map(elTableRowToSelectedLesson)
     .filter((r): r is SelectedLessonRef => r != null);
 }
+
+// 定位「意愿值」列：按表头文字找到列索引（0-based），找不到返回 -1。
+// 「已选课程」表头第 6 列为「意愿值」，但列序可能变化，故按文字定位更稳。
+export function findWillingColumnIndex(scope: Document | Element): number {
+  const headers = Array.from(scope.querySelectorAll('.el-table__header th'));
+  return headers.findIndex((th) => (th.textContent ?? '').includes('意愿'));
+}
+
+// 读取某行「意愿值」单元格：列内是 <div class="cell"><span>N</span>&nbsp;&nbsp; <!----></div>。
+export function willingOfRow(tr: Element, colIndex: number): number | null {
+  if (colIndex < 0) return null;
+  const tds = Array.from(tr.querySelectorAll('td'));
+  const td = tds[colIndex];
+  if (!td) return null;
+  const span = td.querySelector('.cell > span');
+  const raw = (span?.textContent ?? '').replace(/\s+/g, ' ').trim();
+  const n = Number(raw);
+  return raw !== '' && Number.isFinite(n) ? n : null;
+}
+
+// 从「已选课程」tab 收集完整 RawLesson（含教师/学分/时间地点/已选人数/意愿值），
+// 用于「更新已选课程」时把存档里不存在的课程完整添加进去，并覆写意愿值。
+export function extractSelectedRawLessonsFromDom(doc: Document): RawLesson[] {
+  const root = doc.getElementById('selected-lesson') ?? doc;
+  const willingCol = findWillingColumnIndex(root);
+  return Array.from(root.querySelectorAll('tr.el-table__row'))
+    .map((tr) => {
+      const lesson = elTableRowToRawLesson(tr);
+      if (!lesson) return null;
+      const willing = willingOfRow(tr, willingCol);
+      if (willing != null) lesson.willing = willing;
+      return lesson;
+    })
+    .filter((r): r is RawLesson => r != null);
+}

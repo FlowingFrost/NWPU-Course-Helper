@@ -95,6 +95,7 @@ export default function ResultsSection({
   onSelect: (r: ScheduleResult) => void;
 }) {
   const diag = results && results.length === 0 ? diagnoseNoSolution(schedule) : [];
+  const limit = schedule.meta.resultLimit ?? 20;
   return (
     <section className="results">
       <div className="results-head">
@@ -110,11 +111,11 @@ export default function ResultsSection({
           />
         </label>
         <button onClick={onGenerate}>生成可行课表</button>
-        {results && <span className="muted">共 {results.length} 份（展示前 20，点击卡片可叠加到主课表）</span>}
+        {results && <span className="muted">共 {results.length} 份（展示前 {Math.min(limit, results.length)}，点击卡片可叠加到主课表）</span>}
       </div>
       {results && (
         <div className="results-row">
-          {results.slice(0, 20).map((r, i) => (
+          {results.slice(0, limit).map((r, i) => (
             <ResultCard key={i} rank={i + 1} result={r} schedule={schedule} onSelect={onSelect} />
           ))}
           {results.length === 0 && (

@@ -10,6 +10,7 @@ interface JsonRow {
   code?: unknown;
   nameZh?: unknown;
   course?: {
+    id?: unknown;
     code?: unknown;
     nameZh?: unknown;
     credits?: unknown;
@@ -69,6 +70,7 @@ export function rowToRawLesson(row: JsonRow): RawLesson | null {
     teacher: teacherName(row.teacherAssignmentList),
     enrolled: num(row.stdCount),
     capacity: num(row.limitCount),
+    infoId: row.course?.id != null ? str(row.course.id) : null,
     scheduleText: scheduleTextOf(row),
   };
 }

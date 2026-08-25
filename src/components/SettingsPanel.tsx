@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import type { Schedule, Meta, InfoBits, InfoView } from '../../shared/types';
 import { num } from '../lib/num';
 import { infoOf } from '../lib/display';
+import { TEXTBOOK_COLUMNS } from '../lib/textbookColumns';
 import { Field } from './Field';
 
 const HOME_VIEWS: Array<{ id: InfoView; label: string }> = [
@@ -196,6 +197,16 @@ export default function SettingsPanel({
               onChange={(e) => setMeta({ evenCardWidth: e.target.checked })}
             />
           </Field>
+          <Field label="结果展示数量">
+            <input
+              type="number"
+              min={1}
+              max={200}
+              value={meta.resultLimit ?? 20}
+              onChange={(e) => setMeta({ resultLimit: Math.max(1, Math.min(200, num(e.target.value) || 20)) })}
+              title="一键生成可行课表后，结果区最多展示多少份"
+            />
+          </Field>
           <div className="pref-row">
             <Field label="淡化其它课程">
               <input
@@ -252,6 +263,24 @@ export default function SettingsPanel({
             />
           </Field>
           <p className="muted">把「上课课程集合相同」的周合并为一组（含单双周课、断续开课）；关闭后按连续周段独立拆开。</p>
+
+          {/* —— 教材信息 —— */}
+          <div className="settings-category">📚 教材信息</div>
+          <div className="options-head">显示列（在「教材」页表格中展示哪些列）</div>
+          <div className="divider-toggles">
+            {TEXTBOOK_COLUMNS.map((c) => (
+              <label key={c.key} className="divider-toggle">
+                <input
+                  type="checkbox"
+                  checked={meta.textbookColumns?.[c.key] !== false}
+                  onChange={(e) =>
+                    setMeta({ textbookColumns: { ...meta.textbookColumns, [c.key]: e.target.checked } })
+                  }
+                />
+                {c.label}
+              </label>
+            ))}
+          </div>
 
           {/* —— 插件 · 预览 —— */}
           <div className="settings-category">🧩 插件 · 预览</div>

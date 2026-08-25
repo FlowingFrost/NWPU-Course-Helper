@@ -3,6 +3,10 @@
 // 打包成压缩包，供装有 Node.js 的人解压后 `npm install && npm run dev` 使用。
 // 使用说明见包内 README.md。
 //
+// 会把 --version 写进源码包内的 package.json（version/name），让解压后
+// 直接在源码目录里执行 `npm run pack:win -- --version ...` 之外的操作时，
+// 默认版本号也对得上（否则会回退到旧的 0.1.0）。
+//
 // 用法（在项目根目录）：
 //   npm run pack:src                    # 版本号默认读 package.json
 //   npm run pack:src -- --version v1.0alpha
@@ -60,6 +64,17 @@ console.log(`\n========== 打包源码版 ${name} ==========\n`);
 
 fs.rmSync(stageDir, { recursive: true, force: true });
 copyTree('.', stageDir);
+
+// 把 --version 写进源码包的 package.json，保证解压后在源码目录里执行
+// `npm run pack:win` 等读 package.json 版本的操作时，默认版本号也对得上
+// （否则解压后 version 仍是 0.1.0，会回退到旧的默认版本）。
+// 只更新 version / name 两个字段，其余内容保持原样。
+const stagedPkgJsonPath = path.join(stageDir, 'package.json');
+const stagedPkgJson = JSON.parse(fs.readFileSync(stagedPkgJsonPath, 'utf8'));
+// 去掉开头的 "v"，version 字段按 npm 语义化版本约定不带 v（pack.mjs 读取时会自己加回 v）
+stagedPkgJson.version = version.replace(/^v/i, '');
+stagedPkgJson.name = name; // 形如 src-v0.4.0alpha
+fs.writeFileSync(stagedPkgJsonPath, JSON.stringify(stagedPkgJson, null, 2) + '\n');
 
 if (fs.existsSync(zipPath)) fs.rmSync(zipPath);
 if (process.platform === 'win32') {

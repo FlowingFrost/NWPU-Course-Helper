@@ -14,7 +14,8 @@
     {
       "matches": [
         "https://jwxt.nwpu.edu.cn/student/for-std/lesson-search*",
-        "https://jwxt.nwpu.edu.cn/course-selection/*"
+        "https://jwxt.nwpu.edu.cn/course-selection/*",
+        "https://jwxt.nwpu.edu.cn/student/for-std/course-table*"
       ],
       "js": ["content.js"],
       "run_at": "document_idle",

@@ -13,6 +13,8 @@ export interface RawLesson {
   teacher: string; // 授课教师（展示用；时间段内已含每段教师）
   enrolled: number | null; // 已选人数（识别不到为 null）
   capacity: number | null; // 容量（识别不到为 null）
+  willing?: number | null; // 已投入意愿值（仅在「已选课程」tab 能读到；读不到为 undefined/null）
+  infoId?: string | null; // 课程详情 id（用于打开 /lesson-search/info/{id} 提取教材信息）
   scheduleText: string; // 时间地点文本，交给 parseScheduleText 解析
   // 时间地点文本里是否已含教师（默认 true）。选课 SPA 为 false：教师单独成列、文本末尾无教师。
   teacherInScheduleText?: boolean;

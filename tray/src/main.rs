@@ -8,8 +8,11 @@
 
 mod icon;
 
+use std::ffi::OsStr;
+use std::os::windows::ffi::OsStrExt;
 use std::os::windows::process::CommandExt;
 use std::process::Command;
+use std::ptr;
 use std::thread;
 use std::time::Duration;
 
@@ -17,6 +20,8 @@ use tao::event::Event;
 use tao::event_loop::{ControlFlow, EventLoopBuilder};
 use tray_icon::menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem};
 use tray_icon::{Icon, TrayIconBuilder, TrayIconEvent};
+use windows_sys::Win32::Foundation::{CloseHandle, GetLastError, ERROR_ALREADY_EXISTS, HANDLE};
+use windows_sys::Win32::System::Threading::CreateMutexW;
 
 const DEFAULT_PORT: u16 = 3001;
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -55,7 +60,48 @@ fn read_port() -> u16 {
     DEFAULT_PORT
 }
 
+// 单实例互斥体：同名互斥体已存在 → 说明托盘已在运行，多开时只打开网页。
+struct SingleInstance {
+    handle: HANDLE,
+}
+
+impl SingleInstance {
+    fn acquire(name: &str) -> Option<Self> {
+        let wide: Vec<u16> = OsStr::new(name).encode_wide().chain(std::iter::once(0)).collect();
+        unsafe {
+            let handle = CreateMutexW(ptr::null(), 0, wide.as_ptr());
+            if handle == 0 {
+                // 互斥体创建失败：按「未运行」处理，不阻塞正常启动
+                return None;
+            }
+            if GetLastError() == ERROR_ALREADY_EXISTS {
+                CloseHandle(handle);
+                None
+            } else {
+                Some(SingleInstance { handle })
+            }
+        }
+    }
+}
+
+impl Drop for SingleInstance {
+    fn drop(&mut self) {
+        unsafe {
+            CloseHandle(self.handle);
+        }
+    }
+}
+
 fn main() {
+    // 0) 多开限制：已运行则直接打开网页并退出，不重复启动后端/托盘。
+    let _single = match SingleInstance::acquire("CourseHelperTray_SingleInstance") {
+        Some(h) => h,
+        None => {
+            open_browser(read_port());
+            std::process::exit(0);
+        }
+    };
+
     // 1) 启动后端（隐藏窗口，不占任务栏）
     let server_path = exe_dir().join("CourseHelper.exe");
     if !server_path.exists() {

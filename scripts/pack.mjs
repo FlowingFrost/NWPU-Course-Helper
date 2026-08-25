@@ -46,6 +46,23 @@ function cp(src, dst) {
   fs.cpSync(src, dst, { recursive: true });
 }
 
+// 把 Windows PE 的子系统从 console(3) 改成 GUI(2)，双击运行时不弹控制台窗口。
+// 仅 patch 64 位 PE32+（pkg 的 win-x64 产物）；Subsystem 字段位于 OptionalHeader 偏移 68。
+function patchGuiSubsystem(exePath) {
+  const buf = fs.readFileSync(exePath);
+  if (buf.length < 64 || buf[0] !== 0x4d || buf[1] !== 0x5a) return; // 非 MZ
+  const peOffset = buf.readUInt32LE(0x3c);
+  if (peOffset + 92 + 2 > buf.length) return;
+  if (buf.readUInt32LE(peOffset) !== 0x00004550) return; // 非 "PE\0\0"
+  const subsystemOffset = peOffset + 4 + 20 + 68;
+  const subsystem = buf.readUInt16LE(subsystemOffset);
+  if (subsystem === 3) {
+    buf.writeUInt16LE(2, subsystemOffset); // console(3) → GUI(2)
+    fs.writeFileSync(exePath, buf);
+    console.log(`已隐藏后端控制台（子系统 console→GUI）：${path.basename(exePath)}`);
+  }
+}
+
 console.log(`\n========== 打包 ${name}（target=${target}）==========\n`);
 
 // 1) 前端（tsc 类型检查 + vite build → dist/）
@@ -73,6 +90,9 @@ console.log(`\n$ pkg .pack/server.cjs --targets ${target} --output ${exeRel}`);
 // --public + --public-packages '*'：跨平台（如 Linux 打 Windows）时字节码会因 host/target
 // V8 不一致被拒绝（报 "V8 rejected the bytecode cache"），改用明文源码代替字节码规避。
 await pkgExec(['.pack/server.cjs', '--targets', target, '--output', exeRel, '--public', '--public-packages', '*']);
+
+// 4.5) Windows：隐藏后端控制台（子系统 console → GUI）
+if (plat === 'win') patchGuiSubsystem(exeRel);
 
 // 5) 组装发布目录：可执行文件 + 网页 dist/ + 浏览器插件 extension/（+ 托盘壳，若已构建）
 cp('dist', path.join(releaseDir, 'dist'));

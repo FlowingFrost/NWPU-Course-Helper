@@ -13,9 +13,11 @@ import ParseInput from './components/ParseInput';
 import GoalList from './components/GoalList';
 import SelectionStatus from './components/SelectionStatus';
 import ScheduleDetails from './components/ScheduleDetails';
+import NotificationsPanel from './components/NotificationsPanel';
+import TextbooksPanel from './components/TextbooksPanel';
 import Sidebar from './components/Sidebar';
 import { Modal } from './components/Modal';
-import { enumerateSchedules, optionsConflict } from './lib/algo';
+import { enumerateSchedules, optionsConflict, expandResultItems } from './lib/algo';
 import { resolveCourseColors } from './lib/colors';
 import { fixedItems, candidateItems } from './lib/schedule';
 import { infoOf, coInfoOf } from './lib/display';
@@ -208,7 +210,7 @@ export default function App() {
                     结果预览 #{' '}
                     {results ? results.indexOf(activeResult) + 1 : '?'}
                   </div>
-                  <Timetable schedule={schedule} weekFilter={weekFilter} items={activeResult.items} className="overlay-table" info={infoSingle} coInfo={coInfo} showEnrollment={showEnrollment} onBlockClick={handleBlockClick} />
+                  <Timetable schedule={schedule} weekFilter={weekFilter} items={expandResultItems(activeResult.items)} className="overlay-table" info={infoSingle} coInfo={coInfo} showEnrollment={showEnrollment} opaquePending onBlockClick={handleBlockClick} />
                 </div>
               </div>
             )}
@@ -291,6 +293,8 @@ export default function App() {
             />
           )}
           {effectivePanel === 'selection' && <SelectionStatus schedule={schedule} onClose={closePanel} />}
+          {effectivePanel === 'notices' && <NotificationsPanel schedule={schedule} update={update} onClose={closePanel} />}
+          {effectivePanel === 'textbooks' && <TextbooksPanel schedule={schedule} update={update} onClose={closePanel} />}
           {effectivePanel === 'saves' && (
             <SavePicker currentTerm={schedule.meta.term} onSchedule={replace} onClose={closePanel} />
           )}

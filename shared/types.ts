@@ -84,7 +84,24 @@ export interface Meta {
   coInfo?: { enabled?: boolean; showTeacher?: boolean; showRoom?: boolean };
   // 周段优化显示：true=按「课程集合相同的周」合并分组，false=独立显示（连续周段拆开）
   optimizeWeeks?: boolean;
+  // 一键生成可行课表：结果区最多展示的份数（默认 20）
+  resultLimit?: number;
+  // 教材信息页显示哪些列（缺省=显示；false=隐藏）
+  textbookColumns?: Partial<Record<TextbookColumnKey, boolean>>;
 }
+
+// 教材信息页的列
+export type TextbookColumnKey =
+  | 'courseName'
+  | 'courseCode'
+  | 'type'
+  | 'index'
+  | 'name'
+  | 'author'
+  | 'isbn'
+  | 'publisher'
+  | 'edition'
+  | 'pubDate';
 
 // 目标清单：一条「需要完成选课」的记录。target 指向一个课程编号或一个串联组标识。
 export type GoalTargetType = 'course' | 'link';
@@ -103,6 +120,45 @@ export interface ActualSelection {
   courseCodes: string[]; // 实际已选的课程编号（无教学班编号时的兜底匹配）
 }
 
+// —— 通知：插件「更新课程数据 / 更新已选课程」产生的变动记录 ——
+// 分类：enrolled=已选人数（右列）；capacity/time/room/teacher=人数上限/时间/地点/教师（左列）；
+// summary=摘要（「更新已选课程」的整轮统计，全宽展示）。
+export type NoticeKind = 'enrolled' | 'capacity' | 'time' | 'room' | 'teacher' | 'summary';
+
+export interface NoticeItem {
+  kind: NoticeKind;
+  courseName: string; // 课程名（summary 可为空）
+  label: string; // 教学班编号（summary 可为空）
+  oldText: string; // 旧值（summary 为空）
+  newText: string; // 新值（summary 为摘要文本）
+}
+
+// 一轮通知：一次「更新课程数据」或「更新已选课程」操作产生的全部变动，带时间戳。
+export interface NoticeRound {
+  id: string;
+  at: number; // 时间戳（毫秒）
+  source: 'courseData' | 'selectedCourses';
+  items: NoticeItem[];
+}
+
+// —— 教材信息：插件「导出教材信息」抓取的每门课教材/参考书明细 ——
+export interface TextbookRow {
+  type: string; // 教材 / 参考书
+  index: string; // 序号
+  name: string; // 教材名称
+  author: string; // 作者
+  isbn: string; // ISBN/编号
+  publisher: string; // 出版社
+  edition: string; // 版次
+  pubDate: string; // 出版年月
+}
+
+export interface TextbookEntry {
+  courseCode: string;
+  courseName: string;
+  rows: TextbookRow[];
+}
+
 export interface Schedule {
   meta: Meta;
   nodeTimes: NodeTime[];
@@ -110,6 +166,8 @@ export interface Schedule {
   courses: Course[];
   goals?: Goal[]; // 目标清单（选课进度追踪）
   actualSelection?: ActualSelection; // 教务「已选课程」同步结果
+  notices?: NoticeRound[]; // 插件更新产生的通知（持久化）
+  textbooks?: TextbookEntry[]; // 插件「导出教材信息」抓取的教材明细（持久化）
 }
 
 export interface Settings {

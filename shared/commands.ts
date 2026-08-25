@@ -1,4 +1,4 @@
-import type { Schedule, Course, Option, Segment, Category, Meta } from './types';
+import type { Schedule, Course, Option, Segment, Category, Meta, NoticeItem, NoticeRound, TextbookEntry } from './types';
 import { uid, updateCourse, deleteCourse, addOption, updateOption, setSelected, setActualSelection } from './mutations';
 import { segmentsEqual } from './segment';
 
@@ -14,7 +14,9 @@ export type Command =
   | { op: 'update_course'; courseId: string; patch: Partial<Course> }
   | { op: 'delete_course'; courseId: string }
   | { op: 'update_meta'; patch: Partial<Meta> }
-  | { op: 'set_actual_selection'; lessonCodes: string[]; courseCodes: string[] };
+  | { op: 'set_actual_selection'; lessonCodes: string[]; courseCodes: string[] }
+  | { op: 'add_notices'; source: NoticeRound['source']; items: NoticeItem[] }
+  | { op: 'set_textbooks'; entries: TextbookEntry[] };
 
 export function findCourseByOptionId(schedule: Schedule, optionId: string): Course | undefined {
   return schedule.courses.find((c) => c.options.some((o) => o.id === optionId));
@@ -128,6 +130,12 @@ export function applyCommand(schedule: Schedule, cmd: Command): Schedule {
       return { ...schedule, meta: { ...schedule.meta, ...cmd.patch } };
     case 'set_actual_selection':
       return setActualSelection(schedule, cmd.lessonCodes, cmd.courseCodes);
+    case 'add_notices': {
+      const round: NoticeRound = { id: uid('notice'), at: Date.now(), source: cmd.source, items: cmd.items };
+      return { ...schedule, notices: [...(schedule.notices ?? []), round] };
+    }
+    case 'set_textbooks':
+      return { ...schedule, textbooks: cmd.entries };
     default:
       return schedule;
   }

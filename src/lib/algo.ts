@@ -5,6 +5,7 @@ import { fixedItems as collectFixedItems } from './schedule';
 export interface ChosenItem {
   course: Course;
   option: Option;
+  coOptions?: Option[]; // 同时间布局的其它教学班（仅老师/地点/已选人数不同）
 }
 
 export interface ScheduleResult {
@@ -100,12 +101,46 @@ function groupCourses(courses: Course[]): Course[][] {
   return [...singles, ...byLink.values()];
 }
 
+// 时间段的时间签名（忽略教室/教师）：用于查重「时间相同、仅老师/地点不同」的教学班
+function timeSignature(option: Option): string {
+  return option.segments
+    .map((s) => `${s.day}:${s.startNode}:${s.step}:${s.startWeek}:${s.endWeek}`)
+    .sort()
+    .join('|');
+}
+
 // 一组课程 → 所有可选 (course, option) 列表
+// 同一课程内时间相同（仅老师/地点/已选人数不同）的教学班合并为一项：
+// 主候选在前，其余作为 coOptions 保留（用于叠加显示，不丢弃信息）。
 function toGroup(courses: Course[]): ChosenItem[] {
-  return courses.flatMap((c) => {
+  const out: ChosenItem[] = [];
+  const bySig = new Map<string, ChosenItem>();
+  for (const c of courses) {
     const opts = c.options.length ? c.options : [emptyOption()];
-    return opts.map((o) => ({ course: c, option: o }));
-  });
+    for (const o of opts) {
+      const key = `${c.id}:${timeSignature(o)}`;
+      const existing = bySig.get(key);
+      if (existing) {
+        (existing.coOptions ??= []).push(o);
+      } else {
+        const item: ChosenItem = { course: c, option: o };
+        bySig.set(key, item);
+        out.push(item);
+      }
+    }
+  }
+  return out;
+}
+
+// 把结果里的 (course, option, coOptions) 展开成 (course, option) 列表，
+// 主候选在前、同时间其它教学班在后，供课表 dayBlocks 叠加显示。
+export function expandResultItems(items: ChosenItem[]): Array<{ course: Course; option: Option }> {
+  const out: Array<{ course: Course; option: Option }> = [];
+  for (const it of items) {
+    out.push({ course: it.course, option: it.option });
+    if (it.coOptions) for (const o of it.coOptions) out.push({ course: it.course, option: o });
+  }
+  return out;
 }
 
 function subsets<T>(arr: T[], maxSize: number | 'max'): T[][] {

@@ -1,4 +1,4 @@
-import { loadSettings, type ExtResponse } from './messaging';
+import { loadSettings, DEFAULT_BASE_URL, type ExtResponse } from './messaging';
 
 const statusEl = document.getElementById('status')!;
 const baseEl = document.getElementById('base')!;
@@ -18,6 +18,14 @@ async function syncPortFromActiveTab(): Promise<string | null> {
     if (url.protocol !== 'http:') return null;
     if (url.hostname !== 'localhost' && url.hostname !== '127.0.0.1') return null;
     if (!tab.title || !tab.title.includes('选课助手')) return null;
+
+    // Vite 开发服务器（默认 5173）不是 API 服务，其 /api 靠代理到后端；
+    // 直接指向它会导致 chrome-extension:// 跨域预检失败。开发时改回后端默认端口。
+    if (url.port === '5173') {
+      await chrome.storage.sync.set({ baseUrl: DEFAULT_BASE_URL });
+      return DEFAULT_BASE_URL;
+    }
+
     const baseUrl = url.origin; // 例如 http://localhost:3002
     await chrome.storage.sync.set({ baseUrl });
     return baseUrl;

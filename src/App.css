@@ -1752,6 +1752,12 @@ button.primary:hover {
   color: #94a3b8;
 }
 
+.block-cand-enroll {
+  color: #475569;
+  font-weight: 600;
+  margin-left: auto;
+}
+
 /* —— 悬停候选的注释卡片（浮在候选旁） —— */
 .hover-annotation {
   position: fixed;
@@ -2093,4 +2099,251 @@ button.primary:hover {
 .partition-grid.horizontal .partition-card {
   flex: 0 0 auto;
   width: 460px;
+}
+
+/* —— 通知区域（侧边栏「通知」tab） —— */
+.panel-window.notices-panel {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: 100%;
+}
+
+.panel-window.notices-panel .panel-window-body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.notices-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.notices-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.notices-clear {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  border-radius: 6px;
+  padding: 3px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  color: #b91c1c;
+}
+
+.notices-clear:hover {
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+
+/* 每轮通知之间用分割线隔开 */
+.notice-round {
+  padding: 10px 0 12px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.notice-round:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+.notice-round-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.notice-time {
+  font-size: 12px;
+  color: #6b7280;
+  font-variant-numeric: tabular-nums;
+}
+
+.notice-source {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: 999px;
+}
+
+.notice-source.courseData {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.notice-source.selectedCourses {
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.notice-cols {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.notice-col {
+  flex: 1;
+  min-width: 0;
+}
+
+.notice-col.notice-right {
+  border-left: 1px solid #e5e7eb;
+  padding-left: 16px;
+}
+
+.notice-col-head {
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+
+.notice-item {
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 2px 0;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.notice-kind {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.notice-course {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.notice-arrow {
+  color: #9ca3af;
+}
+
+.notice-old {
+  color: #b91c1c;
+}
+
+.notice-new {
+  color: #15803d;
+  font-weight: 600;
+}
+
+.notice-empty {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.notice-summaries {
+  margin-top: 6px;
+  border-top: 1px dashed #e5e7eb;
+  padding-top: 6px;
+}
+
+.notice-item.notice-summary {
+  color: #334155;
+  font-weight: 600;
+}
+
+/* —— 教材信息（侧边栏「教材」tab） —— */
+.panel-window.textbooks-panel {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: 100%;
+}
+
+.panel-window.textbooks-panel .panel-window-body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.textbooks-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.textbooks-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.textbooks-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.textbook-table-wrap {
+  overflow-x: auto;
+  margin-bottom: 10px;
+}
+
+.textbook-table.merged {
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 12px;
+  width: 100%;
+}
+
+.textbook-table.merged th,
+.textbook-table.merged td {
+  border: 1px solid #e5e7eb;
+  padding: 5px 7px;
+  text-align: left;
+  vertical-align: top;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+}
+
+.textbook-table.merged th {
+  background: #f9fafb;
+  font-weight: 600;
+  color: #374151;
+}
+
+.textbook-table.merged td {
+  color: #0f172a;
+}
+
+.textbook-column-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding: 8px 0;
+  border-top: 1px dashed #e5e7eb;
+  font-size: 12px;
+  color: #374151;
+}
+
+.textbook-col-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  user-select: none;
 }

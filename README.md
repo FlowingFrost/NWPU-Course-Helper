@@ -55,5 +55,10 @@ npm run build:ext     # 打包到 extension/dist/
 创建分发
 ```bash
 npm run pack:src -- --version v0.2.5alpha
+```
+在Windows端构建完整客户端
+```bash
+npm install
+npm run build:tray
 npm run pack:win
 ```

@@ -1,6 +1,6 @@
 {
-  "name": "course-helper",
-  "version": "0.1.0",
+  "name": "src-v0.5.0alpha",
+  "version": "0.5.0alpha",
   "private": true,
   "type": "module",
   "scripts": {

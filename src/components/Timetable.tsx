@@ -20,6 +20,7 @@ export default function Timetable({
   info = DEFAULT_INFO,
   showEnrollment = false,
   candidate = false,
+  opaquePending = false,
   style,
   onBlockClick,
   selectedCourseId = null,
@@ -38,6 +39,7 @@ export default function Timetable({
   info?: InfoBits;
   showEnrollment?: boolean;
   candidate?: boolean;
+  opaquePending?: boolean; // 结果课表：待选课程也按不透明渲染（不显示半透明待选课）
   style?: CSSProperties;
   onBlockClick?: (b: DayBlock) => void;
   selectedCourseId?: string | null;
@@ -213,13 +215,14 @@ export default function Timetable({
                     <span className="block-badge">{classBadge(option.label)}</span>
                     {coInfo.showTeacher && teachers.length > 0 && <span className="block-cand-teacher">{teachers.join(' ')}</span>}
                     {coInfo.showRoom && room && <span className="block-cand-room">{room}</span>}
+                    {showEnrollment && <span className="block-cand-enroll">已选 {option.enrolled}/{option.capacity}</span>}
                   </div>
                 );
 
                 return (
                   <div
                     key={b.key}
-                    className={`block ${!candidate && !b.fixed ? 'candidate' : ''}${candidate ? ' cand-table' : ''}${onBlockClick ? ' clickable' : ''}${red ? ' red' : ''}${optionHovered ? ' option-hover' : ''}`}
+                    className={`block ${!candidate && !opaquePending && !b.fixed ? 'candidate' : ''}${candidate ? ' cand-table' : ''}${onBlockClick ? ' clickable' : ''}${red ? ' red' : ''}${optionHovered ? ' option-hover' : ''}`}
                     style={{
                       top: nodeTop(b.startNode) + GAP / 2,
                       height: nodeTop(b.endNode - 1) + rowH - nodeTop(b.startNode) - GAP,

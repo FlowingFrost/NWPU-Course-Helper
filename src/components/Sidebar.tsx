@@ -1,8 +1,8 @@
 import { TOP_TABS, type PanelId, type TopTabId } from '../lib/nav';
 
-const TOP_ICONS: Record<TopTabId, string> = { home: '🏠', goals: '🎯', selection: '✅', details: '📊' };
-const TOP_LABELS: Record<TopTabId, string> = { home: '主页', goals: '目标', selection: '选课', details: '详情' };
-const TOP_TITLES: Record<TopTabId, string> = { home: '主页', goals: '目标清单', selection: '选课情况', details: '课表详情' };
+const TOP_ICONS: Record<TopTabId, string> = { home: '🏠', goals: '🎯', selection: '✅', details: '📊', notices: '🔔', textbooks: '📚' };
+const TOP_LABELS: Record<TopTabId, string> = { home: '主页', goals: '目标', selection: '选课', details: '详情', notices: '通知', textbooks: '教材' };
+const TOP_TITLES: Record<TopTabId, string> = { home: '主页', goals: '目标清单', selection: '选课情况', details: '课表详情', notices: '通知', textbooks: '教材信息' };
 
 const BOTTOM: Array<{ id: 'saves' | 'settings'; icon: string; label: string }> = [
   { id: 'saves', icon: '💾', label: '存档' },

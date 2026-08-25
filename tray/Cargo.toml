@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 tray-icon = "0.21"
 tao = "0.31"
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_Threading"] }
 
 [build-dependencies]
 winres = "0.1"
